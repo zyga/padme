@@ -85,6 +85,8 @@ introduction.
     interface is the :class:`proxy` class and the :func:`unproxied` decorator.
     See below for examples.
 """
+from __future__ import print_function, absolute_import, unicode_literals
+
 import logging
 
 _logger = logging.getLogger("padme")
