@@ -46,7 +46,7 @@ def load_tests(loader, tests, ignore):
 def setUpModule():
     if reality_is_broken:
         import logging
-        logging.basicConfig(logging.DEBUG)
+        logging.basicConfig(level=logging.DEBUG)
 
 
 class proxy_as_function(unittest.TestCase):
