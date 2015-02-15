@@ -282,11 +282,15 @@ class proxy_as_function(unittest.TestCase):
         exc = Exception("boom")
         with self.assertRaisesRegex(Exception, "boom"):
             with self.proxy:
-                raise exc
+                try:
+                    raise exc
+                except:
+                    traceback = sys.exc_info()[2]
+                    raise
         self.obj.__enter__.assert_called_once_with()
         # XXX: it's called with (Exception, exc, traceback) but I don't know
         # how to reach the traceback here
-        self.obj.__exit__.assert_called_once
+        self.obj.__exit__.assert_called_once_with(Exception, exc, traceback)
 
     def test_hasattr_parity(self):
         class C(object):
