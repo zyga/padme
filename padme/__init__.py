@@ -327,7 +327,7 @@ class proxy_base(object):
 
     def __call__(self, *args, **kwargs):
         proxiee = type(self).__proxiee__
-        _logger.debug("call on proxiee (%r)", proxiee)
+        _logger.debug("__call__ on proxiee (%r)", proxiee)
         return proxiee(*args, **kwargs)
 
     def __len__(self):
