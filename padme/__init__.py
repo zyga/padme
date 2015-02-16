@@ -335,10 +335,11 @@ class proxy_base(object):
         _logger.debug("__len__ on proxiee (%r)", proxiee)
         return len(proxiee)
 
-    def __length_hint__(self):
-        proxiee = type(self).__proxiee__
-        _logger.debug("__length_hint__ on proxiee (%r)", proxiee)
-        return proxiee.__length_hint__()
+    if sys.version_info[0:2] >= (3, 4):
+        def __length_hint__(self):
+            proxiee = type(self).__proxiee__
+            _logger.debug("__length_hint__ on proxiee (%r)", proxiee)
+            return proxiee.__length_hint__()
 
     def __getitem__(self, item):
         proxiee = type(self).__proxiee__

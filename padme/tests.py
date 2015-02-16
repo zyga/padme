@@ -209,7 +209,8 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(len(self.proxy), len(self.obj))
         self.assertEqual(self.proxy.__len__(), len(self.obj))
 
-    @unittest.skipIf(sys.version_info[0:2] < (3, 4), "requires python 3.4")
+    @unittest.skipUnless(sys.version_info[0:2] >= (3, 4),
+                         "requires python 3.4")
     def test_length_hint(self):
         # NOTE: apparently MagicMock doesn't support this method
         class C(object):
