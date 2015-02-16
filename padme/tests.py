@@ -342,7 +342,9 @@ class proxy_as_function(unittest.TestCase):
     def test_issubclass(self):
         # NOTE: this method tests the metaclass
         # NOTE: mock doesn't support subclasscheck
-        obj = "something other than mock"
+        # NOTE: str ... below is just for python 2.7
+        # (__future__.unicode_literals is in effect)
+        obj = str("something other than mock")
         self.assertTrue(issubclass(str, type(obj)))
         self.assertTrue(issubclass(str, type(proxy(obj))))
 

@@ -28,13 +28,13 @@ other operations are silently forwarded to the original.
 
 Let's consider a simple example:
 
-    >>> pets = ['cat', 'dog', 'fish']
+    >>> pets = [str('cat'), str('dog'), str('fish')]
     >>> pets_proxy = proxy(pets)
     >>> pets_proxy
     ['cat', 'dog', 'fish']
     >>> isinstance(pets_proxy, list)
     True
-    >>> pets_proxy.append('rooster')
+    >>> pets_proxy.append(str('rooster'))
     >>> pets
     ['cat', 'dog', 'fish', 'rooster']
 
@@ -49,7 +49,8 @@ the word 'cat'. This is how it can be implemented:
     >>> class censor_cat(proxy):
     ...     @unproxied
     ...     def __repr__(self):
-    ...         return super(censor_cat, self).__repr__().replace('cat', '***')
+    ...         return super(censor_cat, self).__repr__().replace(
+    ...             str('cat'), str('***'))
 
 Now let's create a proxy for our pets collection and see how it looks like:
 
@@ -398,7 +399,7 @@ class proxy(proxy_base):
     The proxy class can be used in two different ways. First, as a callable
     ``proxy(obj)``. This simply returns a proxy for a single object.
 
-        >>> truth = ['trust no one']
+        >>> truth = [str('trust no one')]
         >>> lie = proxy(truth)
 
     This will return an instance of a new ``proxy`` sub-class which for all
@@ -417,7 +418,7 @@ class proxy(proxy_base):
 
         >>> lie[0]
         'trust no one'
-        >>> lie[0] = 'trust the government'
+        >>> lie[0] = str('trust the government')
         >>> truth[0]
         'trust the government'
 
@@ -436,7 +437,7 @@ class proxy(proxy_base):
     With this weird class, we can change the repr() of any object we want to be
     ROT-13 encoded. Let's see:
 
-        >>> orig = ['ala ma kota', 'a kot ma ale']
+        >>> orig = [str('ala ma kota'), str('a kot ma ale')]
         >>> prox = crypto(orig)
 
     We can sill access all of the data through the proxy:
