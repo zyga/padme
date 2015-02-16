@@ -15,6 +15,7 @@ Features
 ========
 
 * Free software: LGPLv3 license
+* Support for Python 2.7 and Python 3.2+
 * Documentation: https://padme.readthedocs.org.
 * Create proxy classes for any object with :class:`padme.proxy`.
 * Redirect particular methods in subclasses using :class:`padme.unproxied`.

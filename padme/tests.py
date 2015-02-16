@@ -15,6 +15,8 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with Padme.  If not, see <http://www.gnu.org/licenses/>.
+from __future__ import print_function, absolute_import, unicode_literals
+
 import doctest
 import operator
 import sys
@@ -36,15 +38,16 @@ reality_is_broken = False
 
 
 def load_tests(loader, tests, ignore):
+    import padme
     tests.addTests(
-        doctest.DocTestSuite('padme', optionflags=doctest.REPORT_NDIFF))
+        doctest.DocTestSuite(padme, optionflags=doctest.REPORT_NDIFF))
     return tests
 
 
 def setUpModule():
     if reality_is_broken:
         import logging
-        logging.basicConfig(logging.DEBUG)
+        logging.basicConfig(level=logging.DEBUG)
 
 
 class proxy_as_function(unittest.TestCase):
@@ -71,12 +74,13 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(str(self.proxy), str(self.obj))
         self.assertEqual(self.proxy.__str__(), str(self.obj))
 
+    @unittest.skipUnless(sys.version_info[0] == 3, "requires python 3")
     def test_bytes(self):
         # NOTE: bytes() is unlike str() or repr() in that it is not a function
         # that converts an arbitrary object into a bytes object.  We cannot
         # just call it on a random object. What we must do is implement
         # __bytes__() on a new class and use instances of that class.
-        class C:
+        class C(object):
             def __bytes__(self):
                 return b'good'
         self.obj = C()
@@ -135,9 +139,20 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(hash(self.proxy), hash(self.obj))
         self.assertEqual(self.proxy.__hash__(), hash(self.obj))
 
+    @unittest.skipUnless(sys.version_info[0] == 3, "requires python 3")
     def test_bool(self):
         self.assertEqual(bool(self.proxy), bool(self.obj))
         self.assertEqual(self.proxy.__bool__(), bool(self.obj))
+
+    @unittest.skipUnless(sys.version_info[0] == 2, "requires python 2")
+    def test_nonzero(self):
+        self.assertEqual(bool(self.proxy), bool(self.obj))
+        self.assertEqual(self.proxy.__nonzero__(), bool(self.obj))
+
+    @unittest.skipUnless(sys.version_info[0] == 2, "requires python 2")
+    def test_unicode(self):
+        self.assertEqual(unicode(self.proxy), unicode(self.obj))
+        self.assertEqual(self.proxy.__unicode__(), unicode(self.obj))
 
     def test_attr_get(self):
         self.assertIs(self.proxy.attr, self.obj.attr)
@@ -161,7 +176,7 @@ class proxy_as_function(unittest.TestCase):
         # brevity
         property_proxy = proxy(property)
 
-        class C:
+        class C(object):
             _ok = "default"
 
             @property_proxy
@@ -194,10 +209,11 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(len(self.proxy), len(self.obj))
         self.assertEqual(self.proxy.__len__(), len(self.obj))
 
-    @unittest.skipIf(lambda: sys.version_info[0:2] < 3, 4)
+    @unittest.skipUnless(sys.version_info[0:2] >= (3, 4),
+                         "requires python 3.4")
     def test_length_hint(self):
         # NOTE: apparently MagicMock doesn't support this method
-        class C:
+        class C(object):
             def __length_hint__(self):
                 return 42
         self.obj = C()
@@ -247,7 +263,7 @@ class proxy_as_function(unittest.TestCase):
         with self.assertRaises(AttributeError):
             self.obj.__reversed__.return_value = reversed([])
 
-        class C:
+        class C(object):
             reversed_retval = iter([])
 
             def __reversed__(self):
@@ -279,14 +295,18 @@ class proxy_as_function(unittest.TestCase):
         exc = Exception("boom")
         with self.assertRaisesRegex(Exception, "boom"):
             with self.proxy:
-                raise exc
+                try:
+                    raise exc
+                except:
+                    traceback = sys.exc_info()[2]
+                    raise
         self.obj.__enter__.assert_called_once_with()
         # XXX: it's called with (Exception, exc, traceback) but I don't know
         # how to reach the traceback here
-        self.obj.__exit__.assert_called_once
+        self.obj.__exit__.assert_called_once_with(Exception, exc, traceback)
 
     def test_hasattr_parity(self):
-        class C():
+        class C(object):
             pass
         special_methods = '''
             __del__
@@ -302,6 +322,8 @@ class proxy_as_function(unittest.TestCase):
             __ge__
             __hash__
             __bool__
+            __nonzero__
+            __unicode__
             __getattr__
             __getattribute__
             __setattr__
@@ -340,7 +362,9 @@ class proxy_as_function(unittest.TestCase):
     def test_issubclass(self):
         # NOTE: this method tests the metaclass
         # NOTE: mock doesn't support subclasscheck
-        obj = "something other than mock"
+        # NOTE: str ... below is just for python 2.7
+        # (__future__.unicode_literals is in effect)
+        obj = str("something other than mock")
         self.assertTrue(issubclass(str, type(obj)))
         self.assertTrue(issubclass(str, type(proxy(obj))))
 
@@ -368,7 +392,7 @@ class proxy_as_class(unittest.TestCase):
 
             @unproxied
             def __str__(self):
-                return "*" * len(super().__str__())
+                return "*" * len(super(censored, self).__str__())
         self.assertTrue(issubclass(censored, proxy))
         self.assertEqual(str(censored("freedom")), "*******")
         self.assertEqual(censored("freedom").__str__(), "*******")

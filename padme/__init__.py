@@ -28,13 +28,13 @@ other operations are silently forwarded to the original.
 
 Let's consider a simple example:
 
-    >>> pets = ['cat', 'dog', 'fish']
+    >>> pets = [str('cat'), str('dog'), str('fish')]
     >>> pets_proxy = proxy(pets)
     >>> pets_proxy
     ['cat', 'dog', 'fish']
     >>> isinstance(pets_proxy, list)
     True
-    >>> pets_proxy.append('rooster')
+    >>> pets_proxy.append(str('rooster'))
     >>> pets
     ['cat', 'dog', 'fish', 'rooster']
 
@@ -49,7 +49,8 @@ the word 'cat'. This is how it can be implemented:
     >>> class censor_cat(proxy):
     ...     @unproxied
     ...     def __repr__(self):
-    ...         return super(censor_cat, self).__repr__().replace('cat', '***')
+    ...         return super(censor_cat, self).__repr__().replace(
+    ...             str('cat'), str('***'))
 
 Now let's create a proxy for our pets collection and see how it looks like:
 
@@ -85,7 +86,10 @@ introduction.
     interface is the :class:`proxy` class and the :func:`unproxied` decorator.
     See below for examples.
 """
+from __future__ import print_function, absolute_import, unicode_literals
+
 import logging
+import sys
 
 _logger = logging.getLogger("padme")
 
@@ -119,7 +123,7 @@ class proxy_meta(type):
             _logger.debug(
                 "proxy type %r will pass-thru %r", name, unproxied_set)
         ns['__unproxied__'] = frozenset(unproxied_set)
-        return super().__new__(mcls, name, bases, ns)
+        return super(proxy_meta, mcls).__new__(mcls, name, bases, ns)
 
 
 def make_boundproxy_meta(proxiee):
@@ -149,7 +153,7 @@ def make_boundproxy_meta(proxiee):
                 "__new__ on boundproxy_meta with name %r and bases %r",
                 name, bases)
             ns['__proxiee__'] = proxiee
-            return super().__new__(mcls, name, bases, ns)
+            return super(boundproxy_meta, mcls).__new__(mcls, name, bases, ns)
 
         def __instancecheck__(mcls, instance):
             # NOTE: this is never called in practice since
@@ -166,7 +170,7 @@ def make_boundproxy_meta(proxiee):
     return boundproxy_meta
 
 
-class proxy_base:
+class proxy_base(object):
     """
     Base class for all proxies.
 
@@ -257,10 +261,24 @@ class proxy_base:
         _logger.debug("__hash__ on proxiee (%r)", proxiee)
         return hash(proxiee)
 
-    def __bool__(self):
-        proxiee = type(self).__proxiee__
-        _logger.debug("__bool__ on proxiee (%r)", proxiee)
-        return bool(proxiee)
+    # NOTE: __bool__ is spelled as __nonzero__ in pre-3K world
+    # See PEP:`3100` for details.
+    if sys.version_info[0] == 3:
+        def __bool__(self):
+            proxiee = type(self).__proxiee__
+            _logger.debug("__bool__ on proxiee (%r)", proxiee)
+            return bool(proxiee)
+    else:
+        def __nonzero__(self):
+            proxiee = type(self).__proxiee__
+            _logger.debug("__nonzero__ on proxiee (%r)", proxiee)
+            return bool(proxiee)
+
+    if sys.version_info[0] == 2:
+        def __unicode__(self):
+            proxiee = type(self).__proxiee__
+            _logger.debug("__unicode__ on proxiee (%r)", proxiee)
+            return unicode(proxiee)
 
     def __getattr__(self, name):
         proxiee = type(self).__proxiee__
@@ -309,7 +327,7 @@ class proxy_base:
 
     def __call__(self, *args, **kwargs):
         proxiee = type(self).__proxiee__
-        _logger.debug("call on proxiee (%r)", proxiee)
+        _logger.debug("__call__ on proxiee (%r)", proxiee)
         return proxiee(*args, **kwargs)
 
     def __len__(self):
@@ -317,10 +335,11 @@ class proxy_base:
         _logger.debug("__len__ on proxiee (%r)", proxiee)
         return len(proxiee)
 
-    def __length_hint__(self):
-        proxiee = type(self).__proxiee__
-        _logger.debug("__length_hint__ on proxiee (%r)", proxiee)
-        return proxiee.__length_hint__()
+    if sys.version_info[0:2] >= (3, 4):
+        def __length_hint__(self):
+            proxiee = type(self).__proxiee__
+            _logger.debug("__length_hint__ on proxiee (%r)", proxiee)
+            return proxiee.__length_hint__()
 
     def __getitem__(self, item):
         proxiee = type(self).__proxiee__
@@ -365,14 +384,38 @@ class proxy_base:
         return proxiee.__exit__(exc_type, exc_value, traceback)
 
 
-class proxy(proxy_base, metaclass=proxy_meta):
+class metaclass(object):
+    """
+    Support decorator for Python-agnostic metaclass injection.
+
+    The following snippet illustrates how to use this decorator:
+
+    >>> class my_meta(type):
+    ...     METACLASS_WORKS = True
+    >>> @metaclass(my_meta)
+    ... class my_cls(object):
+    ...     pass
+    >>> assert my_cls.METACLASS_WORKS
+    """
+
+    def __init__(self, mcls):
+        self.mcls = mcls
+
+    def __call__(self, cls):
+        return self.mcls(
+            str('@metaclass({}) {}'.format(
+                self.mcls.__name__, cls.__name__)), (cls,), {})
+
+
+@metaclass(proxy_meta)
+class proxy(proxy_base):
     """
     A mostly transparent proxy type
 
     The proxy class can be used in two different ways. First, as a callable
     ``proxy(obj)``. This simply returns a proxy for a single object.
 
-        >>> truth = ['trust no one']
+        >>> truth = [str('trust no one')]
         >>> lie = proxy(truth)
 
     This will return an instance of a new ``proxy`` sub-class which for all
@@ -391,7 +434,7 @@ class proxy(proxy_base, metaclass=proxy_meta):
 
         >>> lie[0]
         'trust no one'
-        >>> lie[0] = 'trust the government'
+        >>> lie[0] = str('trust the government')
         >>> truth[0]
         'trust the government'
 
@@ -405,12 +448,13 @@ class proxy(proxy_base, metaclass=proxy_meta):
         ...
         ...     @unproxied
         ...     def __repr__(self):
-        ...         return codecs.encode(super().__repr__(), "rot_13")
+        ...         return codecs.encode(
+        ...             super(crypto, self).__repr__(), "rot_13")
 
     With this weird class, we can change the repr() of any object we want to be
     ROT-13 encoded. Let's see:
 
-        >>> orig = ['ala ma kota', 'a kot ma ale']
+        >>> orig = [str('ala ma kota'), str('a kot ma ale')]
         >>> prox = crypto(orig)
 
     We can sill access all of the data through the proxy:
@@ -439,7 +483,8 @@ class proxy(proxy_base, metaclass=proxy_meta):
         _logger.debug("__new__ on proxy with proxiee: %r", proxiee)
         boundproxy_meta = make_boundproxy_meta(proxiee)
 
-        class boundproxy(proxy_cls, metaclass=boundproxy_meta):
+        @metaclass(boundproxy_meta)
+        class boundproxy(proxy_cls):
 
             def __new__(boundproxy_cls):
                 _logger.debug("__new__ on boundproxy %r", boundproxy_cls)
