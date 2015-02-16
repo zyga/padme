@@ -390,7 +390,8 @@ class metaclass(object):
                 self.mcls.__name__, cls.__name__)), (cls,), {})
 
 
-class proxy(proxy_base, metaclass=proxy_meta):
+@metaclass(proxy_meta)
+class proxy(proxy_base):
     """
     A mostly transparent proxy type
 
@@ -464,7 +465,8 @@ class proxy(proxy_base, metaclass=proxy_meta):
         _logger.debug("__new__ on proxy with proxiee: %r", proxiee)
         boundproxy_meta = make_boundproxy_meta(proxiee)
 
-        class boundproxy(proxy_cls, metaclass=boundproxy_meta):
+        @metaclass(boundproxy_meta)
+        class boundproxy(proxy_cls):
 
             def __new__(boundproxy_cls):
                 _logger.debug("__new__ on boundproxy %r", boundproxy_cls)
