@@ -78,7 +78,7 @@ class proxy_as_function(unittest.TestCase):
         # that converts an arbitrary object into a bytes object.  We cannot
         # just call it on a random object. What we must do is implement
         # __bytes__() on a new class and use instances of that class.
-        class C:
+        class C(object):
             def __bytes__(self):
                 return b'good'
         self.obj = C()
@@ -163,7 +163,7 @@ class proxy_as_function(unittest.TestCase):
         # brevity
         property_proxy = proxy(property)
 
-        class C:
+        class C(object):
             _ok = "default"
 
             @property_proxy
@@ -199,7 +199,7 @@ class proxy_as_function(unittest.TestCase):
     @unittest.skipIf(lambda: sys.version_info[0:2] < 3, 4)
     def test_length_hint(self):
         # NOTE: apparently MagicMock doesn't support this method
-        class C:
+        class C(object):
             def __length_hint__(self):
                 return 42
         self.obj = C()
@@ -249,7 +249,7 @@ class proxy_as_function(unittest.TestCase):
         with self.assertRaises(AttributeError):
             self.obj.__reversed__.return_value = reversed([])
 
-        class C:
+        class C(object):
             reversed_retval = iter([])
 
             def __reversed__(self):
@@ -288,7 +288,7 @@ class proxy_as_function(unittest.TestCase):
         self.obj.__exit__.assert_called_once
 
     def test_hasattr_parity(self):
-        class C():
+        class C(object):
             pass
         special_methods = '''
             __del__

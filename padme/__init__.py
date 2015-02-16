@@ -169,7 +169,7 @@ def make_boundproxy_meta(proxiee):
     return boundproxy_meta
 
 
-class proxy_base:
+class proxy_base(object):
     """
     Base class for all proxies.
 
