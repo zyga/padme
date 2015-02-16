@@ -122,7 +122,7 @@ class proxy_meta(type):
             _logger.debug(
                 "proxy type %r will pass-thru %r", name, unproxied_set)
         ns['__unproxied__'] = frozenset(unproxied_set)
-        return super().__new__(mcls, name, bases, ns)
+        return super(proxy_meta, mcls).__new__(mcls, name, bases, ns)
 
 
 def make_boundproxy_meta(proxiee):
@@ -152,7 +152,7 @@ def make_boundproxy_meta(proxiee):
                 "__new__ on boundproxy_meta with name %r and bases %r",
                 name, bases)
             ns['__proxiee__'] = proxiee
-            return super().__new__(mcls, name, bases, ns)
+            return super(boundproxy_meta, mcls).__new__(mcls, name, bases, ns)
 
         def __instancecheck__(mcls, instance):
             # NOTE: this is never called in practice since
@@ -432,7 +432,8 @@ class proxy(proxy_base):
         ...
         ...     @unproxied
         ...     def __repr__(self):
-        ...         return codecs.encode(super().__repr__(), "rot_13")
+        ...         return codecs.encode(
+        ...             super(crypto, self).__repr__(), "rot_13")
 
     With this weird class, we can change the repr() of any object we want to be
     ROT-13 encoded. Let's see:

@@ -372,7 +372,7 @@ class proxy_as_class(unittest.TestCase):
 
             @unproxied
             def __str__(self):
-                return "*" * len(super().__str__())
+                return "*" * len(super(censored, self).__str__())
         self.assertTrue(issubclass(censored, proxy))
         self.assertEqual(str(censored("freedom")), "*******")
         self.assertEqual(censored("freedom").__str__(), "*******")
