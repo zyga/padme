@@ -74,6 +74,7 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(str(self.proxy), str(self.obj))
         self.assertEqual(self.proxy.__str__(), str(self.obj))
 
+    @unittest.skipUnless(sys.version_info[0] == 3, "requires python 3")
     def test_bytes(self):
         # NOTE: bytes() is unlike str() or repr() in that it is not a function
         # that converts an arbitrary object into a bytes object.  We cannot
