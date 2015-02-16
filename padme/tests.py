@@ -138,10 +138,15 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(hash(self.proxy), hash(self.obj))
         self.assertEqual(self.proxy.__hash__(), hash(self.obj))
 
+    @unittest.skipUnless(sys.version_info[0] == 3, "requires python 3")
     def test_bool(self):
         self.assertEqual(bool(self.proxy), bool(self.obj))
         self.assertEqual(self.proxy.__bool__(), bool(self.obj))
 
+    @unittest.skipUnless(sys.version_info[0] == 2, "requires python 2")
+    def test_nonzero(self):
+        self.assertEqual(bool(self.proxy), bool(self.obj))
+        self.assertEqual(self.proxy.__nonzero__(), bool(self.obj))
     def test_attr_get(self):
         self.assertIs(self.proxy.attr, self.obj.attr)
 
@@ -309,6 +314,7 @@ class proxy_as_function(unittest.TestCase):
             __ge__
             __hash__
             __bool__
+            __nonzero__
             __getattr__
             __getattribute__
             __setattr__

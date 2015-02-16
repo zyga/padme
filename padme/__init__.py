@@ -89,6 +89,7 @@ introduction.
 from __future__ import print_function, absolute_import, unicode_literals
 
 import logging
+import sys
 
 _logger = logging.getLogger("padme")
 
@@ -260,10 +261,18 @@ class proxy_base(object):
         _logger.debug("__hash__ on proxiee (%r)", proxiee)
         return hash(proxiee)
 
-    def __bool__(self):
-        proxiee = type(self).__proxiee__
-        _logger.debug("__bool__ on proxiee (%r)", proxiee)
-        return bool(proxiee)
+    # NOTE: __bool__ is spelled as __nonzero__ in pre-3K world
+    # See PEP:`3100` for details.
+    if sys.version_info[0] == 3:
+        def __bool__(self):
+            proxiee = type(self).__proxiee__
+            _logger.debug("__bool__ on proxiee (%r)", proxiee)
+            return bool(proxiee)
+    else:
+        def __nonzero__(self):
+            proxiee = type(self).__proxiee__
+            _logger.debug("__nonzero__ on proxiee (%r)", proxiee)
+            return bool(proxiee)
 
     def __getattr__(self, name):
         proxiee = type(self).__proxiee__
