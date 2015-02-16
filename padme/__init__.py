@@ -367,6 +367,29 @@ class proxy_base:
         return proxiee.__exit__(exc_type, exc_value, traceback)
 
 
+class metaclass(object):
+    """
+    Support decorator for Python-agnostic metaclass injection.
+
+    The following snippet illustrates how to use this decorator:
+
+    >>> class my_meta(type):
+    ...     METACLASS_WORKS = True
+    >>> @metaclass(my_meta)
+    ... class my_cls(object):
+    ...     pass
+    >>> assert my_cls.METACLASS_WORKS
+    """
+
+    def __init__(self, mcls):
+        self.mcls = mcls
+
+    def __call__(self, cls):
+        return self.mcls(
+            str('@metaclass({}) {}'.format(
+                self.mcls.__name__, cls.__name__)), (cls,), {})
+
+
 class proxy(proxy_base, metaclass=proxy_meta):
     """
     A mostly transparent proxy type
