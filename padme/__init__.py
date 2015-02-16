@@ -274,6 +274,12 @@ class proxy_base(object):
             _logger.debug("__nonzero__ on proxiee (%r)", proxiee)
             return bool(proxiee)
 
+    if sys.version_info[0] == 2:
+        def __unicode__(self):
+            proxiee = type(self).__proxiee__
+            _logger.debug("__unicode__ on proxiee (%r)", proxiee)
+            return unicode(proxiee)
+
     def __getattr__(self, name):
         proxiee = type(self).__proxiee__
         _logger.debug("__getattr__ %r on proxiee (%r)", name, proxiee)
