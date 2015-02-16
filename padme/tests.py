@@ -38,8 +38,9 @@ reality_is_broken = False
 
 
 def load_tests(loader, tests, ignore):
+    import padme
     tests.addTests(
-        doctest.DocTestSuite('padme', optionflags=doctest.REPORT_NDIFF))
+        doctest.DocTestSuite(padme, optionflags=doctest.REPORT_NDIFF))
     return tests
 
 
