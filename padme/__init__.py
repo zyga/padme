@@ -304,15 +304,25 @@ class proxy_base(object):
             _logger.debug("__getattribute__ %r on proxy itself", name)
             return object.__getattribute__(self, name)
 
-    def __setattr__(self, attr, value):
-        proxiee = type(self).__proxiee__
-        _logger.debug("__setattr__ %r on proxiee (%r)", attr, proxiee)
-        setattr(proxiee, attr, value)
+    def __setattr__(self, name, value):
+        cls = type(self)
+        if name not in cls.__unproxied__:
+            proxiee = cls.__proxiee__
+            _logger.debug("__setattr__ %r on proxiee (%r)", name, proxiee)
+            setattr(proxiee, name, value)
+        else:
+            _logger.debug("__setattr__ %r on proxy itself", name)
+            object.__setattr__(self, name, value)
 
-    def __delattr__(self, attr):
-        proxiee = type(self).__proxiee__
-        _logger.debug("__delattr__ %r on proxiee (%r)", attr, proxiee)
-        delattr(proxiee, attr)
+    def __delattr__(self, name):
+        cls = type(self)
+        if name not in cls.__unproxied__:
+            proxiee = type(self).__proxiee__
+            _logger.debug("__delattr__ %r on proxiee (%r)", name, proxiee)
+            delattr(proxiee, name)
+        else:
+            _logger.debug("__delattr__ %r on proxy itself", name)
+            object.__delattr__(self, name)
 
     def __dir__(self):
         proxiee = type(self).__proxiee__
