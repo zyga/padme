@@ -133,9 +133,10 @@ def make_boundproxy_meta(proxiee):
     :param proxiee:
         The object that will be proxied
     :returns:
-        A new meta-class that lexically wraps ``proxiee`` and subclasses
-        :class:`proxy_meta`.
+        A new meta-class that lexically wraps ``proxiee`` and ``proxiee_cls``
+        and subclasses :class:`proxy_meta`.
     """
+    proxiee_cls = type(proxiee)
 
     class boundproxy_meta(proxy_meta):
         """
@@ -158,14 +159,14 @@ def make_boundproxy_meta(proxiee):
         def __instancecheck__(mcls, instance):
             # NOTE: this is never called in practice since
             # proxy(obj).__class__ is really obj.__class__.
-            _logger.debug("__instancecheck__ %r on %r", instance, proxiee)
-            return isinstance(instance, type(proxiee))
+            _logger.debug("__instancecheck__ %r on %r", instance, proxiee_cls)
+            return isinstance(instance, proxiee_cls)
 
         def __subclasscheck__(mcls, subclass):
             # This is still called though since type(proxy(obj)) is
             # something else
-            _logger.debug("__subclasscheck__ %r on %r", subclass, proxiee)
-            return issubclass(type(proxiee), subclass)
+            _logger.debug("__subclasscheck__ %r on %r", subclass, proxiee_cls)
+            return issubclass(proxiee_cls, subclass)
 
     return boundproxy_meta
 
