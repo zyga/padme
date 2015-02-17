@@ -256,6 +256,14 @@ class proxy_base(object):
         _logger.debug("__ge__ on proxiee (%r)", proxiee)
         return proxiee >= other
 
+    if sys.version_info[0] == 2:
+        # NOTE: having it in python3 is harmless but it's handled by
+        # __getattribute__ already
+        def __cmp__(self, other):
+            proxiee = type(self).__proxiee__
+            _logger.debug("__cmp__ on proxiee (%r)", proxiee)
+            return cmp(proxiee, other)
+
     def __hash__(self):
         proxiee = type(self).__proxiee__
         _logger.debug("__hash__ on proxiee (%r)", proxiee)

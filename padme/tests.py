@@ -135,6 +135,17 @@ class proxy_as_function(unittest.TestCase):
         self.assertGreaterEqual(self.obj, 0)
         self.assertGreaterEqual(self.obj, -1)
 
+    @unittest.skipUnless(sys.version_info[0] == 2, "requires python 2")
+    def test_cmp(self):
+        class C(object):
+            def __cmp__(self, other):
+                return -1
+        self.obj = C()
+        self.proxy = proxy(self.obj)
+        other = object()
+        self.assertEqual(cmp(self.proxy, other), cmp(self.obj, other))
+        self.assertEqual(self.proxy.__cmp__(other), cmp(self.obj, other))
+
     def test_hash(self):
         self.assertEqual(hash(self.proxy), hash(self.obj))
         self.assertEqual(self.proxy.__hash__(), hash(self.obj))
@@ -320,6 +331,7 @@ class proxy_as_function(unittest.TestCase):
             __ne__
             __gt__
             __ge__
+            __cmp__
             __hash__
             __bool__
             __nonzero__
