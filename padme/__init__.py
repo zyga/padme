@@ -96,7 +96,7 @@ _logger = logging.getLogger("padme")
 __author__ = 'Zygmunt Krynicki'
 __email__ = 'zygmunt.krynicki@canonical.com'
 __version__ = '1.0'
-__all__ = ['proxy', 'unproxied']
+__all__ = ['proxy', 'unproxied', 'proxiee']
 
 
 class proxy_meta(type):
@@ -509,3 +509,39 @@ def unproxied(fn):
     """
     fn.unproxied = True
     return fn
+
+
+def proxiee(proxy):
+    """
+    Return the proxiee (the proxied object) hidden behind the given proxy
+
+    :param proxy:
+        An instance of :class:`proxy` or its subclass.
+    :returns:
+        The original object that the proxy is hiding.
+
+    This function can be used to access the object hidden behind a proxy. This
+    is useful when access to original object is necessary, for example, to
+    implement an ``unproxied`` method.
+
+    In the following example, we cannot use ``super()`` to get access to the
+    append method because the proxy does not really subclass the list object.
+    To override the ``append`` method in a way that allows us to still call the
+    original we must use the :func:`proxiee()` function::
+
+        >>> class verbose_list(proxy):
+        ...     @unproxied
+        ...     def append(self, item):
+        ...         print("Appending:", item)
+        ...         proxiee(self).append(item)
+
+    Now that we have a ``verbose_list`` class, we can use it to see that it
+    works as expected:
+
+        >>> l = verbose_list([])
+        >>> l.append(42)
+        Appending: 42
+        >>> l
+        [42]
+    """
+    return type(proxy).__proxiee__
