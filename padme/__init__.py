@@ -79,7 +79,7 @@ There are only two things that that give our proxy away.
 The ``type()`` function:
 
     >>> type(pets_proxy)  # doctest: +ELLIPSIS
-    <class 'padme...boundproxy'>
+    <class '...boundproxy'>
 
 And the ``id`` function (and anything that checks object identity):
 
@@ -459,9 +459,15 @@ class metaclass(object):
         self.mcls = mcls
 
     def __call__(self, cls):
-        return self.mcls(
-            str('@metaclass({}) {}'.format(
-                self.mcls.__name__, cls.__name__)), (cls,), {})
+        # NOTE: the name is not changed so that sphinx doesn't think this is an
+        # alias of some other object. This is pretty weird but important.
+        name = cls.__name__
+        bases = (cls,)
+        ns = {
+            # Patch-in __doc__ so that various help systems work better
+            '__doc__': cls.__doc__,
+        }
+        return self.mcls(name, bases, ns)
 
 
 @metaclass(proxy_meta)
