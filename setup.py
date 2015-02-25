@@ -30,7 +30,7 @@ history = open('HISTORY.rst').read().replace('.. :changelog:', '')
 
 setup(
     name='padme',
-    version='1.0',
+    version='1.1',
     description='Padme is a mostly transparent proxy class for Python',
     long_description=readme + '\n\n' + history,
     author='Zygmunt Krynicki',
