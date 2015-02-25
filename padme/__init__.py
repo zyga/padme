@@ -116,7 +116,7 @@ class proxy_meta(type):
 
     This meta-class is responsible for gathering the __unproxied__ attributes
     on each created class. The attribute is a frozenset of names that will not
-    be forwarded to the ``proxxie`` but instead will be looked up on the proxy
+    be forwarded to the ``proxiee`` but instead will be looked up on the proxy
     itself.
     """
 
