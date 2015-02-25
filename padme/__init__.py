@@ -60,7 +60,7 @@ the word 'cat'. This is how it can be implemented:
     >>> class censor_cat(proxy):
     ...     @proxy.direct
     ...     def __repr__(self):
-    ...         return super(censor_cat, self).__repr__().replace(
+    ...         return repr(proxy.original(self)).replace(
     ...             str('cat'), str('***'))
 
 Now let's create a proxy for our pets collection and see how it looks like:
