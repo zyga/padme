@@ -12,8 +12,6 @@ Reference
     :special-members:
     :inherited-members:
 
-.. autofunction:: padme.unproxied
-
 Internals
 =========
 

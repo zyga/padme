@@ -11,7 +11,8 @@ History
 * Make ``__length_hint()`` exclusive to Python 3.4.
 * Add support for the ``__cmp__()`` method, exclusive to Python 2.x.
 * Add support for accessing the proxied object with the new
-  :func:`~padme.proxiee()` function.
+  :meth:`~padme.proxy.original()` function.
+* Rename the ``padme.unproxied`` decorator to :meth:`~padme.proxy.direct()`
 
 1.0 (2014-02-11)
 ----------------

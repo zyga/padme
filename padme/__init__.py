@@ -52,13 +52,13 @@ Let's consider a simple example:
 By default, a proxy object is not that interesting. What is more interesting is
 the ability to create subclasses that change a subset of the behavior. For
 implementation simplicity such methods need to be decorated with
-``@unproxied``.
+``@proxy.direct``.
 
 Let's consider a crazy proxy that overrides the ``__repr__()`` method to censor
 the word 'cat'. This is how it can be implemented:
 
     >>> class censor_cat(proxy):
-    ...     @unproxied
+    ...     @proxy.direct
     ...     def __repr__(self):
     ...         return super(censor_cat, self).__repr__().replace(
     ...             str('cat'), str('***'))
@@ -94,8 +94,16 @@ introduction.
 
 .. note::
     There are a number of classes and meta-classes but the only public
-    interface is the :class:`proxy` class and the :func:`unproxied` decorator.
-    See below for examples.
+    interface is the :class:`proxy` class and the :meth:`proxy.direct`
+    decorator.  See below for examples.
+
+Deprecated 1.0 APIs
+-------------------
+
+If you've used Padme before you may have seen ``@unproxied()`` and
+``proxiee()``.  They are still here but ``@unproxied`` is now spelled
+``@proxy.direct`` and ``proxiee()`` is now ``proxy.original()``. This was done
+to allow all of Padme to be used from the one :class:`proxy` class.
 """
 from __future__ import print_function, absolute_import, unicode_literals
 
@@ -107,7 +115,7 @@ _logger = logging.getLogger("padme")
 __author__ = 'Zygmunt Krynicki'
 __email__ = 'zygmunt.krynicki@canonical.com'
 __version__ = '1.0'
-__all__ = ['proxy', 'unproxied', 'proxiee']
+__all__ = ['proxy']
 
 
 class proxy_meta(type):
@@ -470,13 +478,13 @@ class proxy(proxy_base):
 
     The second way of using the ``proxy`` class is as a base class. In this
     way, one can actually override certain methods. To ensure that all the
-    dunder methods work correctly please use the ``@unproxied`` decorator on
+    dunder methods work correctly please use the ``@proxy.direct`` decorator on
     them.
 
         >>> import codecs
         >>> class crypto(proxy):
         ...
-        ...     @unproxied
+        ...     @proxy.direct
         ...     def __repr__(self):
         ...         return codecs.encode(
         ...             super(crypto, self).__repr__(), "rot_13")
@@ -521,49 +529,69 @@ class proxy(proxy_base):
                 return object.__new__(boundproxy_cls)
         return boundproxy()
 
+    @staticmethod
+    def direct(fn):
+        """
+        Mark a method as not-to-be-proxied.
 
-def unproxied(fn):
-    """
-    Mark an object (attribute) as not-to-be-proxied.
+        This decorator can be used inside :class:`proxy` sub-classes. Please
+        consult the documentation of ``proxy`` for details.
 
-    This decorator can be used inside :class:`proxy` sub-classes. Please
-    consult the documentation of ``proxy`` for details.
-    """
-    fn.unproxied = True
-    return fn
+        In practical terms there are two reasons one can use ``proxy.direct``.
 
+        - First, as a way to change the behaviour of a proxy. In this mode a
+          method that already exists on the proxied object is intercepted and
+          custom code is executed. The custom code can still call the original,
+          if desired, by using the :meth:`proxy.original()` function to access
+          the original object
+        - Second, as a way to introduce new functionality to an object. In that
+          sense the resulting proxy will be less transparent as all
+          ``proxy.direct`` methods are explicitly visible and available to
+          access but this may be exactly what is desired in some situations.
 
-def proxiee(proxy):
-    """
-    Return the proxiee (the proxied object) hidden behind the given proxy
+        For additional details on how to use this decorator, see the
+        documentation of the :mod:`padme` module.
+        """
+        fn.unproxied = True
+        return fn
 
-    :param proxy:
-        An instance of :class:`proxy` or its subclass.
-    :returns:
-        The original object that the proxy is hiding.
+    @staticmethod
+    def original(proxy_obj):
+        """
+        Return the :term:`proxiee` hidden behind the given proxy
 
-    This function can be used to access the object hidden behind a proxy. This
-    is useful when access to original object is necessary, for example, to
-    implement an ``unproxied`` method.
+        :param proxy:
+            An instance of :class:`proxy` or its subclass.
+        :returns:
+            The original object that the proxy is hiding.
 
-    In the following example, we cannot use ``super()`` to get access to the
-    append method because the proxy does not really subclass the list object.
-    To override the ``append`` method in a way that allows us to still call the
-    original we must use the :func:`proxiee()` function::
+        This function can be used to access the object hidden behind a proxy.
+        This is useful when access to original object is necessary, for
+        example, to implement an method decorated with ``@proxy.direct``.
 
-        >>> class verbose_list(proxy):
-        ...     @unproxied
-        ...     def append(self, item):
-        ...         print("Appending:", item)
-        ...         proxiee(self).append(item)
+        In the following example, we cannot use ``super()`` to get access to
+        the append method because the proxy does not really subclass the list
+        object.  To override the ``append`` method in a way that allows us to
+        still call the original we must use the :meth:`proxy.original()`
+        function::
 
-    Now that we have a ``verbose_list`` class, we can use it to see that it
-    works as expected:
+            >>> class verbose_list(proxy):
+            ...     @proxy.direct
+            ...     def append(self, item):
+            ...         print("Appending:", item)
+            ...         proxy.original(self).append(item)
 
-        >>> l = verbose_list([])
-        >>> l.append(42)
-        Appending: 42
-        >>> l
-        [42]
-    """
-    return type(proxy).__proxiee__
+        Now that we have a ``verbose_list`` class, we can use it to see that it
+        works as expected:
+
+            >>> l = verbose_list([])
+            >>> l.append(42)
+            Appending: 42
+            >>> l
+            [42]
+        """
+        return type(proxy_obj).__proxiee__
+
+# 1.0 backwards-compatibility aliases
+unproxied = proxy.direct
+proxiee = proxy.original
