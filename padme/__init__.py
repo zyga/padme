@@ -26,6 +26,17 @@ The resulting object is as close to mimicking the original as possible. Some
 things are impossible to fake in CPython so those are highlighted below. All
 other operations are silently forwarded to the original.
 
+Terminology
+-----------
+
+.. glossary:
+
+proxy:
+    An intermediate object that is used in place of some original object.
+
+proxiee:
+    The original object hidden behind one or more proxies.
+
 Let's consider a simple example:
 
     >>> pets = [str('cat'), str('dog'), str('fish')]
