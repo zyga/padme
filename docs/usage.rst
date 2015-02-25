@@ -9,8 +9,6 @@ Reference
 
 .. autoclass:: padme.proxy
     :members:
-    :special-members:
-    :inherited-members:
 
 Internals
 =========
@@ -22,6 +20,10 @@ Internals
 .. autofunction:: padme.make_boundproxy_meta
 
 .. autoclass:: padme.proxy_base
+    :members:
+    :special-members:
+    :undoc-members:
+
 .. autoclass:: padme.proxy_state_namespace
     :members:
     :special-members:
