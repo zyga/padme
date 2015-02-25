@@ -614,6 +614,37 @@ class proxy(proxy_base):
         """
         return type(proxy_obj).__proxiee__
 
+    @staticmethod
+    def state(proxy_obj):
+        """
+        Support function for accessing the state of a proxy object.
+
+        The main reason for this function to exist is to facilitate creating
+        stateful proxy objects. This allows you to put state on objects that
+        cannot otherwise hold it (typically built-in classes or classes using
+        ``__slots__``) and to keep the state invisible to the original object
+        so that it cannot interfere with any future APIs.
+
+        To use it, just call it on any proxy object and use the return value as
+        a normal object you can get/set attributes on. For example:
+
+            >>> life = proxy(42)
+
+        We cannot set attributes on integer instances:
+
+            >>> life.foo = True
+            Traceback (most recent call last):
+                ...
+            AttributeError: 'int' object has no attribute 'foo'
+
+        But we can do that with a proxy around the integer object.
+
+            >>> proxy.state(life).foo = True
+            >>> proxy.state(life).foo
+            True
+        """
+        return type(proxy_obj).__proxy_state__
+
 # 1.0 backwards-compatibility aliases
 unproxied = proxy.direct
 proxiee = proxy.original

@@ -12,7 +12,8 @@ History
 * Add support for the ``__cmp__()`` method, exclusive to Python 2.x.
 * Add support for accessing the proxied object with the new
   :meth:`~padme.proxy.original()` function.
-* Rename the ``padme.unproxied`` decorator to :meth:`~padme.proxy.direct()`
+* Add support for accessing proxy state with the new
+  :meth:`~padme.proxy.state()` function.
 
 1.0 (2014-02-11)
 ----------------
