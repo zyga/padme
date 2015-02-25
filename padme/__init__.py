@@ -37,6 +37,9 @@ proxy:
 proxiee:
     The original object hidden behind one or more proxies.
 
+Basic features
+--------------
+
 Let's consider a simple example:
 
     >>> pets = [str('cat'), str('dog'), str('fish')]
@@ -73,6 +76,82 @@ As before, all other aspects of the proxy behave the same way. All of the
 methods work and are forwarded to the original object. The type of the proxy
 object is correct, event the meta-class of the object is correct (this matters
 for ``issubclass()``, for instance).
+
+Accessing the original object
+-----------------------------
+
+At any time one can access the original object hidden behind any proxy by using
+the :meth:`proxy.original()` function. For example:
+
+    >>> obj = 'hello world'
+    >>> proxy.original(proxy(obj)) is obj
+    True
+
+Accessing proxy state
+---------------------
+
+At any time the state of any proxy object can be accessed using the
+:meth:`proxy.state()` function. The state object behaves as a regular object
+with attributes. It can be used to add custom state to an object that cannot
+hold it, for example:
+
+    >>> obj = 42
+    >>> obj.foo = 42
+    Traceback (most recent call last):
+        ...
+    AttributeError: 'int' object has no attribute 'foo'
+    >>> obj = proxy(obj)
+    >>> obj.foo = 42
+    Traceback (most recent call last):
+        ...
+    AttributeError: 'int' object has no attribute 'foo'
+    >>> proxy.state(obj).foo = 42
+    >>> proxy.state(obj).foo
+    42
+
+Using the @proxy.direct decorator
+---------------------------------
+
+The ``@proxy.direct`` decorator can be used to disable the automatic
+pass-through behavior that is exhibited by any proxy object. In practice we can
+use it to either intercept and substitute an existing functionality or to add a
+new functionality that doesn't exist in the original object.
+
+First, let's write a custom proxy class for the ``bool`` class (which cannot be
+used as a base class anymore) and change the core functionality.
+
+    >>> class nay(proxy):
+    ...
+    ...     @proxy.direct
+    ...     def __nonzero__(self):
+    ...         return not bool(proxiee(self))
+    ...
+    ...     @proxy.direct
+    ...     def __bool__(self):
+    ...         return not bool(proxiee(self))
+
+    >>> bool(nay(True))
+    False
+    >>> bool(nay(False))
+    True
+    >>> if nay([]):
+    ...     print("It works!")
+    It works!
+
+Now, let's write a different proxy class that will add some new functionality
+
+Here, the self_aware_proxy class gives any object a new property, ``is_proxy``
+which always returns ``True``.
+
+    >>> class self_aware_proxy(proxy):
+    ...     @proxy.direct
+    ...     def is_proxy(self):
+    ...         return True
+    >>> self_aware_proxy('hello').is_proxy()
+    True
+
+Limitations
+-----------
 
 There are only two things that that give our proxy away.
 
