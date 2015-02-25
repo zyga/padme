@@ -422,6 +422,24 @@ class proxy_base(object):
         return proxiee.__exit__(exc_type, exc_value, traceback)
 
 
+class proxy_state_namespace(object):
+    """
+    Support class for working with proxy state.
+
+    This class implements simple attribute-based access methods. It is normally
+    instantiated internally for each proxy object. You don't want to fuss with
+    it manually, instead just use :func:`proxy_state()` function to access it.
+    """
+
+    def __init__(self, proxy_obj):
+        proxy_dict = object.__getattribute__(proxy_obj, '__dict__')
+        object.__setattr__(self, '__dict__', proxy_dict)
+
+    def __repr__(self):
+        return "<{}.{} object at {:#x} with state {!r}>".format(
+            __name__, self.__class__.__name__, id(self), self._proxy_dict)
+
+
 class metaclass(object):
     """
     Support decorator for Python-agnostic metaclass injection.

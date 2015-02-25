@@ -22,5 +22,7 @@ Internals
 .. autofunction:: padme.make_boundproxy_meta
 
 .. autoclass:: padme.proxy_base
+.. autoclass:: padme.proxy_state_namespace
+    :members:
     :special-members:
     :undoc-members:
