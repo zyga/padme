@@ -142,6 +142,7 @@ class proxy_meta(type):
             _logger.debug(
                 "proxy type %r will pass-thru %r", name, unproxied_set)
         ns['__unproxied__'] = frozenset(unproxied_set)
+        ns['__proxy_state__'] = None
         return super(proxy_meta, mcls).__new__(mcls, name, bases, ns)
 
 
@@ -544,7 +545,10 @@ class proxy(proxy_base):
 
             def __new__(boundproxy_cls):
                 _logger.debug("__new__ on boundproxy %r", boundproxy_cls)
-                return object.__new__(boundproxy_cls)
+                proxy_obj = object.__new__(boundproxy_cls)
+                proxy_state = proxy_state_namespace(proxy_obj)
+                type(proxy_obj).__proxy_state__ = proxy_state
+                return proxy_obj
         return boundproxy()
 
     @staticmethod
