@@ -270,6 +270,10 @@ def make_boundproxy_meta(proxiee):
     return boundproxy_meta
 
 
+def _get_proxiee(proxy):
+    return type(proxy).__proxiee__
+
+
 class proxy_base(object):
     """
     Base class for all proxies.
@@ -307,52 +311,52 @@ class proxy_base(object):
         """
 
     def __repr__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__repr__ on proxiee (%r)", proxiee)
         return repr(proxiee)
 
     def __str__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__str__ on proxiee (%r)", proxiee)
         return str(proxiee)
 
     def __bytes__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__bytes__ on proxiee (%r)", proxiee)
         return bytes(proxiee)
 
     def __format__(self, format_spec):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__format__ on proxiee (%r)", proxiee)
         return format(proxiee, format_spec)
 
     def __lt__(self, other):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__lt__ on proxiee (%r)", proxiee)
         return proxiee < other
 
     def __le__(self, other):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__le__ on proxiee (%r)", proxiee)
         return proxiee <= other
 
     def __eq__(self, other):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__eq__ on proxiee (%r)", proxiee)
         return proxiee == other
 
     def __ne__(self, other):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__ne__ on proxiee (%r)", proxiee)
         return proxiee != other
 
     def __gt__(self, other):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__gt__ on proxiee (%r)", proxiee)
         return proxiee > other
 
     def __ge__(self, other):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__ge__ on proxiee (%r)", proxiee)
         return proxiee >= other
 
@@ -360,12 +364,12 @@ class proxy_base(object):
         # NOTE: having it in python3 is harmless but it's handled by
         # __getattribute__ already
         def __cmp__(self, other):
-            proxiee = type(self).__proxiee__
+            proxiee = _get_proxiee(self)
             _logger.debug("__cmp__ on proxiee (%r)", proxiee)
             return cmp(proxiee, other)
 
     def __hash__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__hash__ on proxiee (%r)", proxiee)
         return hash(proxiee)
 
@@ -373,30 +377,29 @@ class proxy_base(object):
     # See PEP:`3100` for details.
     if sys.version_info[0] == 3:
         def __bool__(self):
-            proxiee = type(self).__proxiee__
+            proxiee = _get_proxiee(self)
             _logger.debug("__bool__ on proxiee (%r)", proxiee)
             return bool(proxiee)
     else:
         def __nonzero__(self):
-            proxiee = type(self).__proxiee__
+            proxiee = _get_proxiee(self)
             _logger.debug("__nonzero__ on proxiee (%r)", proxiee)
             return bool(proxiee)
 
     if sys.version_info[0] == 2:
         def __unicode__(self):
-            proxiee = type(self).__proxiee__
+            proxiee = _get_proxiee(self)
             _logger.debug("__unicode__ on proxiee (%r)", proxiee)
             return unicode(proxiee)
 
     def __getattr__(self, name):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__getattr__ %r on proxiee (%r)", name, proxiee)
         return getattr(proxiee, name)
 
     def __getattribute__(self, name):
-        cls = type(self)
-        if name not in cls.__unproxied__:
-            proxiee = cls.__proxiee__
+        if name not in type(self).__unproxied__:
+            proxiee = _get_proxiee(self)
             _logger.debug("__getattribute__ %r on proxiee (%r)", name, proxiee)
             return getattr(proxiee, name)
         else:
@@ -404,9 +407,8 @@ class proxy_base(object):
             return object.__getattribute__(self, name)
 
     def __setattr__(self, name, value):
-        cls = type(self)
-        if name not in cls.__unproxied__:
-            proxiee = cls.__proxiee__
+        if name not in type(self).__unproxied__:
+            proxiee = _get_proxiee(self)
             _logger.debug("__setattr__ %r on proxiee (%r)", name, proxiee)
             setattr(proxiee, name, value)
         else:
@@ -416,7 +418,7 @@ class proxy_base(object):
     def __delattr__(self, name):
         cls = type(self)
         if name not in cls.__unproxied__:
-            proxiee = type(self).__proxiee__
+            proxiee = _get_proxiee(self)
             _logger.debug("__delattr__ %r on proxiee (%r)", name, proxiee)
             delattr(proxiee, name)
         else:
@@ -424,80 +426,80 @@ class proxy_base(object):
             object.__delattr__(self, name)
 
     def __dir__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__dir__ on proxiee (%r)", proxiee)
         return dir(proxiee)
 
     def __get__(self, instance, owner):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__get__ on proxiee (%r)", proxiee)
         return proxiee.__get__(instance, owner)
 
     def __set__(self, instance, value):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__set__ on proxiee (%r)", proxiee)
         proxiee.__set__(instance, value)
 
     def __delete__(self, instance):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__delete__ on proxiee (%r)", proxiee)
         proxiee.__delete__(instance)
 
     def __call__(self, *args, **kwargs):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__call__ on proxiee (%r)", proxiee)
         return proxiee(*args, **kwargs)
 
     def __len__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__len__ on proxiee (%r)", proxiee)
         return len(proxiee)
 
     if sys.version_info[0:2] >= (3, 4):
         def __length_hint__(self):
-            proxiee = type(self).__proxiee__
+            proxiee = _get_proxiee(self)
             _logger.debug("__length_hint__ on proxiee (%r)", proxiee)
             return proxiee.__length_hint__()
 
     def __getitem__(self, item):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__getitem__ on proxiee (%r)", proxiee)
         return proxiee[item]
 
     def __setitem__(self, item, value):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__setitem__ on proxiee (%r)", proxiee)
         proxiee[item] = value
 
     def __delitem__(self, item):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__delitem__ on proxiee (%r)", proxiee)
         del proxiee[item]
 
     def __iter__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__iter__ on proxiee (%r)", proxiee)
         return iter(proxiee)
 
     def __reversed__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__reversed__ on proxiee (%r)", proxiee)
         return reversed(proxiee)
 
     def __contains__(self, item):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__contains__ on proxiee (%r)", proxiee)
         return item in proxiee
 
     # TODO: all numeric methods
 
     def __enter__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__enter__ on proxiee (%r)", proxiee)
         return proxiee.__enter__()
 
     def __exit__(self, exc_type, exc_value, traceback):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__exit__ on proxiee (%r)", proxiee)
         return proxiee.__exit__(exc_type, exc_value, traceback)
 
@@ -697,7 +699,7 @@ class proxy(proxy_base):
             >>> l
             [42]
         """
-        return type(proxy_obj).__proxiee__
+        return _get_proxiee(proxy_obj)
 
     @staticmethod
     def state(proxy_obj):
