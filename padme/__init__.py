@@ -600,10 +600,11 @@ class metaclass(object):
     def __init__(self, mcls):
         self.mcls = mcls
 
-    def __call__(self, cls):
+    def __call__(self, cls, name=None):
         # NOTE: the name is not changed so that sphinx doesn't think this is an
         # alias of some other object. This is pretty weird but important.
-        name = cls.__name__
+        if name is None:
+            name = cls.__name__
         bases = (cls,)
         ns = {
             # Patch-in __doc__ so that various help systems work better
