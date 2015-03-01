@@ -207,9 +207,10 @@ class proxy_meta(type):
     itself.
     """
 
-    def __new__(mcls, name, bases, ns):
+    def __new__(mcls, name, bases, ns, *args, **kwargs):
         _logger.debug(
-            "__new__ on proxy_meta with name: %r, bases: %r", name, bases)
+            "__new__ on proxy_meta with name: %r, bases: %r"
+            " (args: %r, kwargs %r)", name, bases, args, kwargs)
         unproxied_set = set()
         for base in bases:
             if hasattr(base, '__unproxied__'):
@@ -672,7 +673,7 @@ class proxy(proxy_base):
         ['nyn zn xbgn', 'n xbg zn nyr']
     """
 
-    def __new__(proxy_cls, proxiee):
+    def __new__(proxy_cls, proxiee, *args, **kwargs):
         """
         Create a new instance of ``proxy()`` wrapping ``proxiee``
 
