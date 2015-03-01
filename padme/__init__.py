@@ -580,7 +580,7 @@ class proxy_state_namespace(object):
 
     def __repr__(self):
         return "<{}.{} object at {:#x} with state {!r}>".format(
-            __name__, self.__class__.__name__, id(self), self._proxy_dict)
+            __name__, self.__class__.__name__, id(self), self.__dict__)
 
 
 class metaclass(object):
