@@ -274,7 +274,7 @@ def make_typed_proxy_meta(proxiee_cls):
 
 
 def _get_proxiee(proxy_obj):
-    return proxy_state(proxy_obj)._original
+    return object.__getattribute__(proxy_obj, '_original')
 
 
 def _get_unproxied(proxy):
