@@ -224,6 +224,49 @@ class proxy_meta(type):
         return super(proxy_meta, mcls).__new__(mcls, name, bases, ns)
 
 
+def make_typed_proxy_meta(proxiee_cls):
+    """
+    Make a new proxy meta-class for the specified class of proxiee objects
+
+    .. note::
+
+        Had python had an easier way of doing this, it would have been spelled
+        as ``proxy_meta[cls]`` but I didn't want to drag pretty things into
+        something nobody would ever see.
+
+    :param proxiee_cls:
+        The type of the that will be proxied
+    :returns:
+        A new meta-class that lexically wraps ``proxiee`` and ``proxiee_cls``
+        and subclasses :class:`proxy_meta`.
+    """
+    def __instancecheck__(mcls, instance):
+        # NOTE: this is never called in practice since
+        # proxy(obj).__class__ is really obj.__class__.
+        _logger.debug("__instancecheck__ %r on %r", instance, proxiee_cls)
+        return isinstance(instance, proxiee_cls)
+
+    def __subclasscheck__(mcls, subclass):
+        # This is still called though since type(proxy(obj)) is
+        # something else
+        _logger.debug("__subclasscheck__ %r on %r", subclass, proxiee_cls)
+        return issubclass(proxiee_cls, subclass)
+
+    name = str('proxy_meta[{}]').format(proxiee_cls.__name__)
+    bases = (proxy_meta,)
+    ns = {
+        '__doc__': """
+        Meta-class for all proxies type-bound to type {}.
+
+        This class implements two methods that participate in instance and
+        class checks: ``__instancecheck__`` and ``__subclasscheck__``.
+        """.format(proxiee_cls.__name__),
+        '__instancecheck__': __instancecheck__,
+        '__subclasscheck__': __subclasscheck__
+    }
+    return proxy_meta(name, bases, ns)
+
+
 class stateful_proxy_meta(proxy_meta):
     """
     Meta-class for all proxy types
