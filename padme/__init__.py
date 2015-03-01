@@ -571,7 +571,7 @@ class proxy_state_namespace(object):
 
     This class implements simple attribute-based access methods. It is normally
     instantiated internally for each proxy object. You don't want to fuss with
-    it manually, instead just use :func:`proxy_state()` function to access it.
+    it manually, instead just use :meth:`proxy.state()` function to access it.
     """
 
     def __init__(self, proxy_obj):
