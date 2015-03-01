@@ -190,12 +190,12 @@ from __future__ import print_function, absolute_import, unicode_literals
 import logging
 import sys
 
-_logger = logging.getLogger("padme")
-
 __author__ = 'Zygmunt Krynicki'
 __email__ = 'zygmunt.krynicki@canonical.com'
 __version__ = '1.0'
 __all__ = (str('proxy'), )
+
+_logger = logging.getLogger("padme")
 
 
 class proxy_meta(type):
