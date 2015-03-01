@@ -188,6 +188,7 @@ to allow all of Padme to be used from the one :class:`proxy` class.
 from __future__ import print_function, absolute_import, unicode_literals
 
 import logging
+import operator
 import sys
 
 __author__ = 'Zygmunt Krynicki'
@@ -294,6 +295,10 @@ def _get_proxiee(proxy_obj):
     return object.__getattribute__(proxy_obj, '_original')
 
 
+def _set_proxiee(proxy_obj, proxiee):
+    return object.__setattr__(proxy_obj, '_original', proxiee)
+
+
 def _get_unproxied(proxy):
     return type(proxy).__unproxied__
 
@@ -320,6 +325,36 @@ if sys.version_info[0] == 2:
     _imethods.add('__idiv__')
 
 _imethods = frozenset(_imethods)
+
+
+def _imethod(self, other, name, op):
+    """
+    Shared implementation of __iFUNC__ method.
+
+    :param self:
+        A proxy_base instance
+    :param other:
+        Any right-hand-side value
+    :param name:
+        Name of the __iFUNC__
+    :param op:
+        Appropriate operator.__iFUNC__ operator
+    :returns:
+        self
+    """
+    proxiee_old = proxiee_new = _get_proxiee(self)
+    _logger.debug("%s on proxiee (%r)", name, proxiee_old)
+    # NOTE: This _may_ or _may not be_ calling __iFUNC__
+    # as the proxiee may not support it in the first place
+    proxiee_new = op(proxiee_old, other)
+    if proxiee_new is not proxiee_old:
+        # NOTE: all of the augmented assignment methods handle the case where
+        # the __iFUNC__ method returns something other than self. To maintain
+        # the illusion that the proxy is not there the internal proxiee
+        # reference is changed to the new proxiee.
+        _logger.debug("%s sets new proxiee (%r)", name, proxiee_new)
+        _set_proxiee(self, proxiee_new)
+    return self
 
 
 class proxy_base(object):
@@ -554,7 +589,270 @@ class proxy_base(object):
         _logger.debug("__contains__ on proxiee (%r)", proxiee)
         return item in proxiee
 
-    # TODO: all numeric methods
+    # NOTE: __{get,set,del}slice__() methods are not implemented as they are
+    # not used anymore by anything, AFAIK
+
+    # all basic numeric methods
+
+    def __add__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__add__ on proxiee (%r)", proxiee)
+        return proxiee + other
+
+    def __sub__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__sub__ on proxiee (%r)", proxiee)
+        return proxiee - other
+
+    def __mul__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__mul__ on proxiee (%r)", proxiee)
+        return proxiee * other
+
+    if sys.version_info[0] == 2:
+        def __div__(self, other):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__div__ on proxiee (%r)", proxiee)
+            return operator.div(proxiee, other)
+
+    def __truediv__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__truediv__ on proxiee (%r)", proxiee)
+        return operator.truediv(proxiee, other)
+
+    def __floordiv__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__floordiv__ on proxiee (%r)", proxiee)
+        return proxiee // other
+
+    def __mod__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__mod__ on proxiee (%r)", proxiee)
+        return proxiee % other
+
+    def __divmod__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__divmod__ on proxiee (%r)", proxiee)
+        return divmod(proxiee, other)
+
+    def __pow__(self, other, modulo=None):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__pow__ on proxiee (%r)", proxiee)
+        return pow(proxiee, other, modulo)
+
+    def __lshift__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__lshift__ on proxiee (%r)", proxiee)
+        return proxiee << other
+
+    def __rshift__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rshift__ on proxiee (%r)", proxiee)
+        return proxiee >> other
+
+    def __and__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__and__ on proxiee (%r)", proxiee)
+        return proxiee & other
+
+    def __xor__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__xor__ on proxiee (%r)", proxiee)
+        return proxiee ^ other
+
+    def __or__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__or__ on proxiee (%r)", proxiee)
+        return proxiee | other
+
+    # all reversed numeric methods
+
+    def __radd__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__radd__ on proxiee (%r)", proxiee)
+        return other + proxiee
+
+    def __rsub__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rsub__ on proxiee (%r)", proxiee)
+        return other - proxiee
+
+    def __rmul__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rmul__ on proxiee (%r)", proxiee)
+        return other * proxiee
+
+    if sys.version_info[0] == 2:
+        def __rdiv__(self, other):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__rdiv__ on proxiee (%r)", proxiee)
+            return operator.__div__(other, proxiee)
+
+    def __rtruediv__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rtruediv__ on proxiee (%r)", proxiee)
+        return operator.__truediv__(other, proxiee)
+
+    def __rfloordiv__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rfloordiv__ on proxiee (%r)", proxiee)
+        return other // proxiee
+
+    def __rmod__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rmod__ on proxiee (%r)", proxiee)
+        return other % proxiee
+
+    def __rdivmod__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rdivmod__ on proxiee (%r)", proxiee)
+        return divmod(other, proxiee)
+
+    def __rpow__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rpow__ on proxiee (%r)", proxiee)
+        return pow(other, proxiee)
+
+    def __rlshift__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rlshift__ on proxiee (%r)", proxiee)
+        return other << proxiee
+
+    def __rrshift__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rrshift__ on proxiee (%r)", proxiee)
+        return other >> proxiee
+
+    def __rand__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rand__ on proxiee (%r)", proxiee)
+        return other & proxiee
+
+    def __rxor__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rxor__ on proxiee (%r)", proxiee)
+        return other ^ proxiee
+
+    def __ror__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rrshift__ on proxiee (%r)", proxiee)
+        return other | proxiee
+
+    # all augmented assignment numeric methods
+
+    def __iadd__(self, other):
+        return _imethod(self, other, '__iadd__', operator.iadd)
+
+    def __isub__(self, other):
+        return _imethod(self, other, '__isub__', operator.isub)
+
+    def __imul__(self, other):
+        return _imethod(self, other, '__imul__', operator.imul)
+
+    if sys.version_info[0] == 2:
+        def __idiv__(self, other):
+            return _imethod(self, other, '__idiv__', operator.idiv)
+
+    def __itruediv__(self, other):
+        return _imethod(self, other, '__itruediv__', operator.itruediv)
+
+    def __ifloordiv__(self, other):
+        return _imethod(self, other, '__ifloordiv__', operator.ifloordiv)
+
+    def __imod__(self, other):
+        return _imethod(self, other, '__imod__', operator.imod)
+
+    def __ipow__(self, other, modulo=None):
+        assert modulo is None
+        return _imethod(self, other, '__ipow__', operator.ipow)
+
+    def __ilshift__(self, other):
+        return _imethod(self, other, '__ilshift__', operator.ilshift)
+
+    def __irshift__(self, other):
+        return _imethod(self, other, '__irshift__', operator.irshift)
+
+    def __iand__(self, other):
+        return _imethod(self, other, '__iand__', operator.iand)
+
+    def __ixor__(self, other):
+        return _imethod(self, other, '__ixor__', operator.ixor)
+
+    def __ior__(self, other):
+        return _imethod(self, other, '__ior__', operator.ior)
+
+    # all miscellaneous numeric methods
+
+    def __neg__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__neg__ on proxiee (%r)", proxiee)
+        return - proxiee
+
+    def __pos__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__pos__ on proxiee (%r)", proxiee)
+        return + proxiee
+
+    def __abs__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__abs__ on proxiee (%r)", proxiee)
+        return abs(proxiee)
+
+    def __invert__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__invert__ on proxiee (%r)", proxiee)
+        return ~ proxiee
+
+    # Helpers for built-ins: complex(), int(), float() and round()
+
+    def __complex__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__complex__ on proxiee (%r)", proxiee)
+        return complex(proxiee)
+
+    def __int__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__int__ on proxiee (%r)", proxiee)
+        return int(proxiee)
+
+    if sys.version_info[0] == 2:
+        def __long__(self):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__long__ on proxiee (%r)", proxiee)
+            return long(proxiee)
+
+    def __float__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__float__ on proxiee (%r)", proxiee)
+        return float(proxiee)
+
+    if sys.version_info[0] == 3:
+        def __round__(self, n):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__float__ on proxiee (%r)", proxiee)
+            return round(proxiee, n)
+
+    if sys.version_info[0] == 2:
+        def __oct__(self):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__oct__ on proxiee (%r)", proxiee)
+            return oct(proxiee)
+
+        def __hex__(self):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__hex__ on proxiee (%r)", proxiee)
+            return hex(proxiee)
+
+    def __index__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__index__ on proxiee (%r)", proxiee)
+        return operator.index(proxiee)
+
+    if sys.version_info[0] == 2:
+        def __coerce__(self, other):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__coerce__ on proxiee (%r)", proxiee)
+            return coerce(proxiee, other)
 
     def __enter__(self):
         proxiee = _get_proxiee(self)
