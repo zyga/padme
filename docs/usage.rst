@@ -9,6 +9,7 @@ Reference
 
 .. autoclass:: padme.proxy
     :members:
+    :inherited-members:
 
 Internals
 =========
