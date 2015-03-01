@@ -26,6 +26,20 @@ The resulting object is as close to mimicking the original as possible. Some
 things are impossible to fake in CPython so those are highlighted below. All
 other operations are silently forwarded to the original.
 
+Terminology
+-----------
+
+.. glossary:
+
+proxy:
+    An intermediate object that is used in place of some original object.
+
+proxiee:
+    The original object hidden behind one or more proxies.
+
+Basic features
+--------------
+
 Let's consider a simple example:
 
     >>> pets = [str('cat'), str('dog'), str('fish')]
@@ -41,15 +55,15 @@ Let's consider a simple example:
 By default, a proxy object is not that interesting. What is more interesting is
 the ability to create subclasses that change a subset of the behavior. For
 implementation simplicity such methods need to be decorated with
-``@unproxied``.
+``@proxy.direct``.
 
 Let's consider a crazy proxy that overrides the ``__repr__()`` method to censor
 the word 'cat'. This is how it can be implemented:
 
     >>> class censor_cat(proxy):
-    ...     @unproxied
+    ...     @proxy.direct
     ...     def __repr__(self):
-    ...         return super(censor_cat, self).__repr__().replace(
+    ...         return repr(proxy.original(self)).replace(
     ...             str('cat'), str('***'))
 
 Now let's create a proxy for our pets collection and see how it looks like:
@@ -63,12 +77,88 @@ methods work and are forwarded to the original object. The type of the proxy
 object is correct, event the meta-class of the object is correct (this matters
 for ``issubclass()``, for instance).
 
+Accessing the original object
+-----------------------------
+
+At any time one can access the original object hidden behind any proxy by using
+the :meth:`proxy.original()` function. For example:
+
+    >>> obj = 'hello world'
+    >>> proxy.original(proxy(obj)) is obj
+    True
+
+Accessing proxy state
+---------------------
+
+At any time the state of any proxy object can be accessed using the
+:meth:`proxy.state()` function. The state object behaves as a regular object
+with attributes. It can be used to add custom state to an object that cannot
+hold it, for example:
+
+    >>> obj = 42
+    >>> obj.foo = 42
+    Traceback (most recent call last):
+        ...
+    AttributeError: 'int' object has no attribute 'foo'
+    >>> obj = proxy(obj)
+    >>> obj.foo = 42
+    Traceback (most recent call last):
+        ...
+    AttributeError: 'int' object has no attribute 'foo'
+    >>> proxy.state(obj).foo = 42
+    >>> proxy.state(obj).foo
+    42
+
+Using the @proxy.direct decorator
+---------------------------------
+
+The ``@proxy.direct`` decorator can be used to disable the automatic
+pass-through behavior that is exhibited by any proxy object. In practice we can
+use it to either intercept and substitute an existing functionality or to add a
+new functionality that doesn't exist in the original object.
+
+First, let's write a custom proxy class for the ``bool`` class (which cannot be
+used as a base class anymore) and change the core functionality.
+
+    >>> class nay(proxy):
+    ...
+    ...     @proxy.direct
+    ...     def __nonzero__(self):
+    ...         return not bool(proxiee(self))
+    ...
+    ...     @proxy.direct
+    ...     def __bool__(self):
+    ...         return not bool(proxiee(self))
+
+    >>> bool(nay(True))
+    False
+    >>> bool(nay(False))
+    True
+    >>> if nay([]):
+    ...     print("It works!")
+    It works!
+
+Now, let's write a different proxy class that will add some new functionality
+
+Here, the self_aware_proxy class gives any object a new property, ``is_proxy``
+which always returns ``True``.
+
+    >>> class self_aware_proxy(proxy):
+    ...     @proxy.direct
+    ...     def is_proxy(self):
+    ...         return True
+    >>> self_aware_proxy('hello').is_proxy()
+    True
+
+Limitations
+-----------
+
 There are only two things that that give our proxy away.
 
 The ``type()`` function:
 
     >>> type(pets_proxy)  # doctest: +ELLIPSIS
-    <class 'padme...boundproxy'>
+    <class '...censor_cat[list]'>
 
 And the ``id`` function (and anything that checks object identity):
 
@@ -83,8 +173,16 @@ introduction.
 
 .. note::
     There are a number of classes and meta-classes but the only public
-    interface is the :class:`proxy` class and the :func:`unproxied` decorator.
-    See below for examples.
+    interface is the :class:`proxy` class and the :meth:`proxy.direct`
+    decorator.  See below for examples.
+
+Deprecated 1.0 APIs
+-------------------
+
+If you've used Padme before you may have seen ``@unproxied()`` and
+``proxiee()``.  They are still here but ``@unproxied`` is now spelled
+``@proxy.direct`` and ``proxiee()`` is now ``proxy.original()``. This was done
+to allow all of Padme to be used from the one :class:`proxy` class.
 """
 from __future__ import print_function, absolute_import, unicode_literals
 
@@ -96,7 +194,7 @@ _logger = logging.getLogger("padme")
 __author__ = 'Zygmunt Krynicki'
 __email__ = 'zygmunt.krynicki@canonical.com'
 __version__ = '1.0'
-__all__ = ['proxy', 'unproxied']
+__all__ = ['proxy']
 
 
 class proxy_meta(type):
@@ -105,13 +203,14 @@ class proxy_meta(type):
 
     This meta-class is responsible for gathering the __unproxied__ attributes
     on each created class. The attribute is a frozenset of names that will not
-    be forwarded to the ``proxxie`` but instead will be looked up on the proxy
+    be forwarded to the ``proxiee`` but instead will be looked up on the proxy
     itself.
     """
 
-    def __new__(mcls, name, bases, ns):
+    def __new__(mcls, name, bases, ns, *args, **kwargs):
         _logger.debug(
-            "__new__ on proxy_meta with name: %r, bases: %r", name, bases)
+            "__new__ on proxy_meta with name: %r, bases: %r"
+            " (args: %r, kwargs %r)", name, bases, args, kwargs)
         unproxied_set = set()
         for base in bases:
             if hasattr(base, '__unproxied__'):
@@ -123,51 +222,60 @@ class proxy_meta(type):
             _logger.debug(
                 "proxy type %r will pass-thru %r", name, unproxied_set)
         ns['__unproxied__'] = frozenset(unproxied_set)
+        _logger.debug("injecting fresh _c_registry into %s", name)
+        ns['_c_registry'] = {}
         return super(proxy_meta, mcls).__new__(mcls, name, bases, ns)
 
 
-def make_boundproxy_meta(proxiee):
+def make_typed_proxy_meta(proxiee_cls):
     """
-    Make a new bound proxy meta-class for the specified object
+    Make a new proxy meta-class for the specified class of proxiee objects
 
-    :param proxiee:
-        The object that will be proxied
+    .. note::
+
+        Had python had an easier way of doing this, it would have been spelled
+        as ``proxy_meta[cls]`` but I didn't want to drag pretty things into
+        something nobody would ever see.
+
+    :param proxiee_cls:
+        The type of the that will be proxied
     :returns:
-        A new meta-class that lexically wraps ``proxiee`` and subclasses
-        :class:`proxy_meta`.
+        A new meta-class that lexically wraps ``proxiee`` and ``proxiee_cls``
+        and subclasses :class:`proxy_meta`.
     """
+    def __instancecheck__(mcls, instance):
+        # NOTE: this is never called in practice since
+        # proxy(obj).__class__ is really obj.__class__.
+        _logger.debug("__instancecheck__ %r on %r", instance, proxiee_cls)
+        return isinstance(instance, proxiee_cls)
 
-    class boundproxy_meta(proxy_meta):
-        """
-        Meta-class for all bound proxies.
+    def __subclasscheck__(mcls, subclass):
+        # This is still called though since type(proxy(obj)) is
+        # something else
+        _logger.debug("__subclasscheck__ %r on %r", subclass, proxiee_cls)
+        return issubclass(proxiee_cls, subclass)
 
-        This meta-class is responsible for setting the setting the
-        ``__proxiee__`` attribute to the proxiee object itself.
+    name = str('proxy_meta[{}]').format(proxiee_cls.__name__)
+    bases = (proxy_meta,)
+    ns = {
+        '__doc__': """
+        Meta-class for all proxies type-bound to type {}.
 
-        In addition, it implements two methods that participate in instance and
+        This class implements two methods that participate in instance and
         class checks: ``__instancecheck__`` and ``__subclasscheck__``.
-        """
+        """.format(proxiee_cls.__name__),
+        '__instancecheck__': __instancecheck__,
+        '__subclasscheck__': __subclasscheck__
+    }
+    return proxy_meta(name, bases, ns)
 
-        def __new__(mcls, name, bases, ns):
-            _logger.debug(
-                "__new__ on boundproxy_meta with name %r and bases %r",
-                name, bases)
-            ns['__proxiee__'] = proxiee
-            return super(boundproxy_meta, mcls).__new__(mcls, name, bases, ns)
 
-        def __instancecheck__(mcls, instance):
-            # NOTE: this is never called in practice since
-            # proxy(obj).__class__ is really obj.__class__.
-            _logger.debug("__instancecheck__ %r on %r", instance, proxiee)
-            return isinstance(instance, type(proxiee))
+def _get_proxiee(proxy_obj):
+    return proxy_state(proxy_obj)._original
 
-        def __subclasscheck__(mcls, subclass):
-            # This is still called though since type(proxy(obj)) is
-            # something else
-            _logger.debug("__subclasscheck__ %r on %r", subclass, proxiee)
-            return issubclass(type(proxiee), subclass)
 
-    return boundproxy_meta
+def _get_unproxied(proxy):
+    return type(proxy).__unproxied__
 
 
 class proxy_base(object):
@@ -207,57 +315,65 @@ class proxy_base(object):
         """
 
     def __repr__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__repr__ on proxiee (%r)", proxiee)
         return repr(proxiee)
 
     def __str__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__str__ on proxiee (%r)", proxiee)
         return str(proxiee)
 
     def __bytes__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__bytes__ on proxiee (%r)", proxiee)
         return bytes(proxiee)
 
     def __format__(self, format_spec):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__format__ on proxiee (%r)", proxiee)
         return format(proxiee, format_spec)
 
     def __lt__(self, other):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__lt__ on proxiee (%r)", proxiee)
         return proxiee < other
 
     def __le__(self, other):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__le__ on proxiee (%r)", proxiee)
         return proxiee <= other
 
     def __eq__(self, other):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__eq__ on proxiee (%r)", proxiee)
         return proxiee == other
 
     def __ne__(self, other):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__ne__ on proxiee (%r)", proxiee)
         return proxiee != other
 
     def __gt__(self, other):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__gt__ on proxiee (%r)", proxiee)
         return proxiee > other
 
     def __ge__(self, other):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__ge__ on proxiee (%r)", proxiee)
         return proxiee >= other
 
+    if sys.version_info[0] == 2:
+        # NOTE: having it in python3 is harmless but it's handled by
+        # __getattribute__ already
+        def __cmp__(self, other):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__cmp__ on proxiee (%r)", proxiee)
+            return cmp(proxiee, other)
+
     def __hash__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__hash__ on proxiee (%r)", proxiee)
         return hash(proxiee)
 
@@ -265,123 +381,148 @@ class proxy_base(object):
     # See PEP:`3100` for details.
     if sys.version_info[0] == 3:
         def __bool__(self):
-            proxiee = type(self).__proxiee__
+            proxiee = _get_proxiee(self)
             _logger.debug("__bool__ on proxiee (%r)", proxiee)
             return bool(proxiee)
     else:
         def __nonzero__(self):
-            proxiee = type(self).__proxiee__
+            proxiee = _get_proxiee(self)
             _logger.debug("__nonzero__ on proxiee (%r)", proxiee)
             return bool(proxiee)
 
     if sys.version_info[0] == 2:
         def __unicode__(self):
-            proxiee = type(self).__proxiee__
+            proxiee = _get_proxiee(self)
             _logger.debug("__unicode__ on proxiee (%r)", proxiee)
             return unicode(proxiee)
 
     def __getattr__(self, name):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__getattr__ %r on proxiee (%r)", name, proxiee)
         return getattr(proxiee, name)
 
     def __getattribute__(self, name):
-        cls = type(self)
-        if name not in cls.__unproxied__:
-            proxiee = cls.__proxiee__
+        if name not in _get_unproxied(self):
+            proxiee = _get_proxiee(self)
             _logger.debug("__getattribute__ %r on proxiee (%r)", name, proxiee)
             return getattr(proxiee, name)
         else:
             _logger.debug("__getattribute__ %r on proxy itself", name)
             return object.__getattribute__(self, name)
 
-    def __setattr__(self, attr, value):
-        proxiee = type(self).__proxiee__
-        _logger.debug("__setattr__ %r on proxiee (%r)", attr, proxiee)
-        setattr(proxiee, attr, value)
+    def __setattr__(self, name, value):
+        if name not in _get_unproxied(self):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__setattr__ %r on proxiee (%r)", name, proxiee)
+            setattr(proxiee, name, value)
+        else:
+            _logger.debug("__setattr__ %r on proxy itself", name)
+            object.__setattr__(self, name, value)
 
-    def __delattr__(self, attr):
-        proxiee = type(self).__proxiee__
-        _logger.debug("__delattr__ %r on proxiee (%r)", attr, proxiee)
-        delattr(proxiee, attr)
+    def __delattr__(self, name):
+        if name not in _get_unproxied(self):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__delattr__ %r on proxiee (%r)", name, proxiee)
+            delattr(proxiee, name)
+        else:
+            _logger.debug("__delattr__ %r on proxy itself", name)
+            object.__delattr__(self, name)
 
     def __dir__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__dir__ on proxiee (%r)", proxiee)
         return dir(proxiee)
 
     def __get__(self, instance, owner):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__get__ on proxiee (%r)", proxiee)
         return proxiee.__get__(instance, owner)
 
     def __set__(self, instance, value):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__set__ on proxiee (%r)", proxiee)
         proxiee.__set__(instance, value)
 
     def __delete__(self, instance):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__delete__ on proxiee (%r)", proxiee)
         proxiee.__delete__(instance)
 
     def __call__(self, *args, **kwargs):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__call__ on proxiee (%r)", proxiee)
         return proxiee(*args, **kwargs)
 
     def __len__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__len__ on proxiee (%r)", proxiee)
         return len(proxiee)
 
     if sys.version_info[0:2] >= (3, 4):
         def __length_hint__(self):
-            proxiee = type(self).__proxiee__
+            proxiee = _get_proxiee(self)
             _logger.debug("__length_hint__ on proxiee (%r)", proxiee)
             return proxiee.__length_hint__()
 
     def __getitem__(self, item):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__getitem__ on proxiee (%r)", proxiee)
         return proxiee[item]
 
     def __setitem__(self, item, value):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__setitem__ on proxiee (%r)", proxiee)
         proxiee[item] = value
 
     def __delitem__(self, item):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__delitem__ on proxiee (%r)", proxiee)
         del proxiee[item]
 
     def __iter__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__iter__ on proxiee (%r)", proxiee)
         return iter(proxiee)
 
     def __reversed__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__reversed__ on proxiee (%r)", proxiee)
         return reversed(proxiee)
 
     def __contains__(self, item):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__contains__ on proxiee (%r)", proxiee)
         return item in proxiee
 
     # TODO: all numeric methods
 
     def __enter__(self):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__enter__ on proxiee (%r)", proxiee)
         return proxiee.__enter__()
 
     def __exit__(self, exc_type, exc_value, traceback):
-        proxiee = type(self).__proxiee__
+        proxiee = _get_proxiee(self)
         _logger.debug("__exit__ on proxiee (%r)", proxiee)
         return proxiee.__exit__(exc_type, exc_value, traceback)
+
+
+class proxy_state(object):
+    """
+    Support class for working with proxy state.
+
+    This class implements simple attribute-based access methods. It is normally
+    instantiated internally for each proxy object. You don't want to fuss with
+    it manually, instead just use :meth:`proxy.state()` function to access it.
+    """
+
+    def __init__(self, proxy_obj):
+        proxy_dict = object.__getattribute__(proxy_obj, '__dict__')
+        object.__setattr__(self, '__dict__', proxy_dict)
+
+    def __repr__(self):
+        return "<{}.{} object at {:#x} with state {!r}>".format(
+            __name__, self.__class__.__name__, id(self), self.__dict__)
 
 
 class metaclass(object):
@@ -401,10 +542,19 @@ class metaclass(object):
     def __init__(self, mcls):
         self.mcls = mcls
 
-    def __call__(self, cls):
-        return self.mcls(
-            str('@metaclass({}) {}'.format(
-                self.mcls.__name__, cls.__name__)), (cls,), {})
+    def __call__(self, cls, name=None):
+        # NOTE: the name is not changed so that sphinx doesn't think this is an
+        # alias of some other object. This is pretty weird but important.
+        if name is None:
+            name = cls.__name__
+        bases = (cls,)
+        ns = {
+            # Patch-in __doc__ so that various help systems work better
+            '__doc__': cls.__doc__,
+        }
+        _logger.debug("metaclass(%s)(%s, name=%r)",
+                      self.mcls.__name__, cls.__name__, name)
+        return self.mcls(name, bases, ns)
 
 
 @metaclass(proxy_meta)
@@ -440,13 +590,13 @@ class proxy(proxy_base):
 
     The second way of using the ``proxy`` class is as a base class. In this
     way, one can actually override certain methods. To ensure that all the
-    dunder methods work correctly please use the ``@unproxied`` decorator on
+    dunder methods work correctly please use the ``@proxy.direct`` decorator on
     them.
 
         >>> import codecs
         >>> class crypto(proxy):
         ...
-        ...     @unproxied
+        ...     @proxy.direct
         ...     def __repr__(self):
         ...         return codecs.encode(
         ...             super(crypto, self).__repr__(), "rot_13")
@@ -467,37 +617,152 @@ class proxy(proxy_base):
         >>> prox
         ['nyn zn xbgn', 'n xbg zn nyr']
     """
+    # Registry of known typed_proxy_meta objects
+    _m_registry = {}
 
-    def __new__(proxy_cls, proxiee):
+    # There is a corresponding _c_registry but it is reset for each proxy
+    # subclass by proxy_meta.
+
+    def __new__(proxy_cls, proxiee, *args, **kwargs):
         """
         Create a new instance of ``proxy()`` wrapping ``proxiee``
 
         :param proxiee:
             The object to proxy
         :returns:
-            An instance of new subclass of ``proxy``, called ``boundproxy``
-            that uses a new meta-class that lexically bounds the ``proxiee``
-            argument. The new sub-class has a different implementation of
-            ``__new__`` and can be instantiated without additional arguments.
+            An instance of new subclass of ``proxy`` with injected meta-class
+            proxy_meta[cls] where cls is the type of proxiee.
         """
-        _logger.debug("__new__ on proxy with proxiee: %r", proxiee)
-        boundproxy_meta = make_boundproxy_meta(proxiee)
+        _logger.debug(
+            "__new__ on %s with proxiee: %r (args: %r, kwargs %r)",
+            proxy_cls.__name__, proxiee, args, kwargs)
+        proxiee_cls = type(proxiee)
+        if proxiee_cls not in proxy_cls._m_registry:
+            typed_proxy_meta = make_typed_proxy_meta(proxiee_cls)
+            proxy_cls._m_registry[proxiee_cls] = typed_proxy_meta
+        else:
+            typed_proxy_meta = proxy_cls._m_registry[proxiee_cls]
+        if proxiee_cls not in proxy_cls._c_registry:
+            typed_proxy_cls = metaclass(typed_proxy_meta)(
+                proxy_cls, str('{}[{}]').format(
+                    proxy_cls.__name__, proxiee_cls.__name__))
+            proxy_cls._c_registry[proxiee_cls] = typed_proxy_cls
+        else:
+            typed_proxy_cls = proxy_cls._c_registry[proxiee_cls]
+        # XXX: This somehow magically calls __init__(*args, **kwargs)
+        proxy_obj = object.__new__(typed_proxy_cls)
+        state = proxy_state(proxy_obj)
+        state._original = proxiee
+        _logger.debug("__new__ on %s is about to return", proxy_cls.__name__)
+        return proxy_obj
 
-        @metaclass(boundproxy_meta)
-        class boundproxy(proxy_cls):
+    def __init__(proxy_obj, proxiee):
+        """
+        Initialize a fresh proxy instance specific to ``proxiee``
 
-            def __new__(boundproxy_cls):
-                _logger.debug("__new__ on boundproxy %r", boundproxy_cls)
-                return object.__new__(boundproxy_cls)
-        return boundproxy()
+        :param proxiee:
+            The object to proxy
+        """
+        _logger.debug("__init__ on %s with proxiee: %r",
+                      type(proxy_obj).__name__, proxiee)
+
+    @staticmethod
+    def direct(fn):
+        """
+        Mark a method as not-to-be-proxied.
+
+        This decorator can be used inside :class:`proxy` sub-classes. Please
+        consult the documentation of ``proxy`` for details.
+
+        In practical terms there are two reasons one can use ``proxy.direct``.
+
+        - First, as a way to change the behaviour of a proxy. In this mode a
+          method that already exists on the proxied object is intercepted and
+          custom code is executed. The custom code can still call the original,
+          if desired, by using the :meth:`proxy.original()` function to access
+          the original object
+        - Second, as a way to introduce new functionality to an object. In that
+          sense the resulting proxy will be less transparent as all
+          ``proxy.direct`` methods are explicitly visible and available to
+          access but this may be exactly what is desired in some situations.
+
+        For additional details on how to use this decorator, see the
+        documentation of the :mod:`padme` module.
+        """
+        fn.unproxied = True
+        _logger.debug("function %r marked as unproxied/direct", fn)
+        return fn
+
+    @staticmethod
+    def original(proxy_obj):
+        """
+        Return the :term:`proxiee` hidden behind the given proxy
+
+        :param proxy:
+            An instance of :class:`proxy` or its subclass.
+        :returns:
+            The original object that the proxy is hiding.
+
+        This function can be used to access the object hidden behind a proxy.
+        This is useful when access to original object is necessary, for
+        example, to implement an method decorated with ``@proxy.direct``.
+
+        In the following example, we cannot use ``super()`` to get access to
+        the append method because the proxy does not really subclass the list
+        object.  To override the ``append`` method in a way that allows us to
+        still call the original we must use the :meth:`proxy.original()`
+        function::
+
+            >>> class verbose_list(proxy):
+            ...     @proxy.direct
+            ...     def append(self, item):
+            ...         print("Appending:", item)
+            ...         proxy.original(self).append(item)
+
+        Now that we have a ``verbose_list`` class, we can use it to see that it
+        works as expected:
+
+            >>> l = verbose_list([])
+            >>> l.append(42)
+            Appending: 42
+            >>> l
+            [42]
+        """
+        state = proxy_state(proxy_obj)
+        return state._original
+
+    @staticmethod
+    def state(proxy_obj):
+        """
+        Support function for accessing the state of a proxy object.
+
+        The main reason for this function to exist is to facilitate creating
+        stateful proxy objects. This allows you to put state on objects that
+        cannot otherwise hold it (typically built-in classes or classes using
+        ``__slots__``) and to keep the state invisible to the original object
+        so that it cannot interfere with any future APIs.
+
+        To use it, just call it on any proxy object and use the return value as
+        a normal object you can get/set attributes on. For example:
+
+            >>> life = proxy(42)
+
+        We cannot set attributes on integer instances:
+
+            >>> life.foo = True
+            Traceback (most recent call last):
+                ...
+            AttributeError: 'int' object has no attribute 'foo'
+
+        But we can do that with a proxy around the integer object.
+
+            >>> proxy.state(life).foo = True
+            >>> proxy.state(life).foo
+            True
+        """
+        return proxy_state(proxy_obj)
 
 
-def unproxied(fn):
-    """
-    Mark an object (attribute) as not-to-be-proxied.
-
-    This decorator can be used inside :class:`proxy` sub-classes. Please
-    consult the documentation of ``proxy`` for details.
-    """
-    fn.unproxied = True
-    return fn
+# 1.0 backwards-compatibility aliases
+unproxied = proxy.direct
+proxiee = proxy.original
