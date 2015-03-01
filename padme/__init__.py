@@ -195,7 +195,7 @@ _logger = logging.getLogger("padme")
 __author__ = 'Zygmunt Krynicki'
 __email__ = 'zygmunt.krynicki@canonical.com'
 __version__ = '1.0'
-__all__ = ('proxy', )
+__all__ = (str('proxy'), )
 
 
 class proxy_meta(type):
