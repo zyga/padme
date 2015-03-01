@@ -281,6 +281,7 @@ class stateful_proxy_meta(proxy_meta):
         ns['__proxy_state__'] = None
         return super(stateful_proxy_meta, mcls).__new__(mcls, name, bases, ns)
 
+
 def make_boundproxy_meta(proxiee):
     """
     Make a new bound proxy meta-class for the specified object
