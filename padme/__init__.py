@@ -211,8 +211,8 @@ class proxy_meta(type):
 
     def __new__(mcls, name, bases, ns, *args, **kwargs):
         _logger.debug(
-            "__new__ on proxy_meta with name: %r, bases: %r"
-            " (args: %r, kwargs %r)", name, bases, args, kwargs)
+            "%s.__new__ with name: %r, bases: %r (args: %r, kwargs %r)",
+            mcls.__name__, name, bases, args, kwargs)
         unproxied_set = set()
         for base in bases:
             if hasattr(base, '__unproxied__'):
@@ -224,7 +224,7 @@ class proxy_meta(type):
             _logger.debug(
                 "proxy type %r will pass-thru %r", name, unproxied_set)
         ns['__unproxied__'] = frozenset(unproxied_set)
-        _logger.debug("injecting fresh _c_registry into %s", name)
+        # _logger.debug("injecting fresh _c_registry into %s", name)
         ns['_c_registry'] = {}
         return super(proxy_meta, mcls).__new__(mcls, name, bases, ns)
 
@@ -646,7 +646,7 @@ class proxy(proxy_base):
             proxy_meta[cls] where cls is the type of proxiee.
         """
         _logger.debug(
-            "__new__ on %s with proxiee: %r (args: %r, kwargs %r)",
+            "%s.__new__ with proxiee: %r (args: %r, kwargs %r)",
             proxy_cls.__name__, proxiee, args, kwargs)
         proxiee_cls = type(proxiee)
         if proxiee_cls not in proxy_cls._m_registry:
@@ -664,8 +664,10 @@ class proxy(proxy_base):
         # XXX: This somehow magically calls __init__(*args, **kwargs)
         proxy_obj = object.__new__(typed_proxy_cls)
         state = proxy_state(proxy_obj)
+        # _logger.debug("%s.__new__ inserted _original into instance",
+        #               proxy_cls.__name__)
         state._original = proxiee
-        _logger.debug("__new__ on %s is about to return", proxy_cls.__name__)
+        # _logger.debug("%s.__new__ is about to return", proxy_cls.__name__)
         return proxy_obj
 
     def __init__(proxy_obj, proxiee):
@@ -675,8 +677,8 @@ class proxy(proxy_base):
         :param proxiee:
             The object to proxy
         """
-        _logger.debug("__init__ on %s with proxiee: %r",
-                      type(proxy_obj).__name__, proxiee)
+        _logger.debug(
+            "%s.__init__ with proxiee: %r", type(proxy_obj).__name__, proxiee)
 
     @staticmethod
     def direct(fn):
