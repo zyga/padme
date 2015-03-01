@@ -271,7 +271,7 @@ def make_typed_proxy_meta(proxiee_cls):
 
 
 def _get_proxiee(proxy_obj):
-    return proxy_state_namespace(proxy_obj)._original
+    return proxy_state(proxy_obj)._original
 
 
 def _get_unproxied(proxy):
@@ -507,7 +507,7 @@ class proxy_base(object):
         return proxiee.__exit__(exc_type, exc_value, traceback)
 
 
-class proxy_state_namespace(object):
+class proxy_state(object):
     """
     Support class for working with proxy state.
 
@@ -651,7 +651,7 @@ class proxy(proxy_base):
             typed_proxy_cls = proxy_cls._c_registry[proxiee_cls]
         # XXX: This somehow magically calls __init__(*args, **kwargs)
         proxy_obj = object.__new__(typed_proxy_cls)
-        state = proxy_state_namespace(proxy_obj)
+        state = proxy_state(proxy_obj)
         state._original = proxiee
         _logger.debug("__new__ on %s is about to return", proxy_cls.__name__)
         return proxy_obj
@@ -728,7 +728,7 @@ class proxy(proxy_base):
             >>> l
             [42]
         """
-        state = proxy_state_namespace(proxy_obj)
+        state = proxy_state(proxy_obj)
         return state._original
 
     @staticmethod
@@ -760,7 +760,7 @@ class proxy(proxy_base):
             >>> proxy.state(life).foo
             True
         """
-        return proxy_state_namespace(proxy_obj)
+        return proxy_state(proxy_obj)
 
 
 # 1.0 backwards-compatibility aliases

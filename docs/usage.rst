@@ -24,7 +24,7 @@ Internals
     :special-members:
     :undoc-members:
 
-.. autoclass:: padme.proxy_state_namespace
+.. autoclass:: padme.proxy_state
     :members:
     :special-members:
     :undoc-members:
