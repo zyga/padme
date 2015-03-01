@@ -610,6 +610,8 @@ class metaclass(object):
             # Patch-in __doc__ so that various help systems work better
             '__doc__': cls.__doc__,
         }
+        _logger.debug("metaclass(%s)(%s, name=%r)",
+                      self.mcls.__name__, cls.__name__, name)
         return self.mcls(name, bases, ns)
 
 
