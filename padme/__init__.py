@@ -158,7 +158,7 @@ There are only two things that that give our proxy away.
 The ``type()`` function:
 
     >>> type(pets_proxy)  # doctest: +ELLIPSIS
-    <class '...boundproxy'>
+    <class '...censor_cat[list]'>
 
 And the ``id`` function (and anything that checks object identity):
 
@@ -222,6 +222,8 @@ class proxy_meta(type):
             _logger.debug(
                 "proxy type %r will pass-thru %r", name, unproxied_set)
         ns['__unproxied__'] = frozenset(unproxied_set)
+        _logger.debug("injecting fresh _c_registry into %s", name)
+        ns['_c_registry'] = {}
         return super(proxy_meta, mcls).__new__(mcls, name, bases, ns)
 
 
@@ -268,68 +270,8 @@ def make_typed_proxy_meta(proxiee_cls):
     return proxy_meta(name, bases, ns)
 
 
-class stateful_proxy_meta(proxy_meta):
-    """
-    Meta-class for all proxy types
-
-    This meta-class is responsible for gathering the __unproxied__ attributes
-    on each created class. The attribute is a frozenset of names that will not
-    be forwarded to the ``proxiee`` but instead will be looked up on the proxy
-    itself.
-    """
-
-    def __new__(mcls, name, bases, ns):
-        ns['__proxy_state__'] = None
-        return super(stateful_proxy_meta, mcls).__new__(mcls, name, bases, ns)
-
-
-def make_boundproxy_meta(proxiee):
-    """
-    Make a new bound proxy meta-class for the specified object
-
-    :param proxiee:
-        The object that will be proxied
-    :returns:
-        A new meta-class that lexically wraps ``proxiee`` and ``proxiee_cls``
-        and subclasses :class:`stateful_proxy_meta`.
-    """
-    proxiee_cls = type(proxiee)
-
-    class boundproxy_meta(stateful_proxy_meta):
-        """
-        Meta-class for all bound proxies.
-
-        This meta-class is responsible for setting the setting the
-        ``__proxiee__`` attribute to the proxiee object itself.
-
-        In addition, it implements two methods that participate in instance and
-        class checks: ``__instancecheck__`` and ``__subclasscheck__``.
-        """
-
-        def __new__(mcls, name, bases, ns):
-            _logger.debug(
-                "__new__ on boundproxy_meta with name %r and bases %r",
-                name, bases)
-            ns['__proxiee__'] = proxiee
-            return super(boundproxy_meta, mcls).__new__(mcls, name, bases, ns)
-
-        def __instancecheck__(mcls, instance):
-            # NOTE: this is never called in practice since
-            # proxy(obj).__class__ is really obj.__class__.
-            _logger.debug("__instancecheck__ %r on %r", instance, proxiee_cls)
-            return isinstance(instance, proxiee_cls)
-
-        def __subclasscheck__(mcls, subclass):
-            # This is still called though since type(proxy(obj)) is
-            # something else
-            _logger.debug("__subclasscheck__ %r on %r", subclass, proxiee_cls)
-            return issubclass(proxiee_cls, subclass)
-
-    return boundproxy_meta
-
-
-def _get_proxiee(proxy):
-    return type(proxy).__proxiee__
+def _get_proxiee(proxy_obj):
+    return proxy_state_namespace(proxy_obj)._original
 
 
 def _get_unproxied(proxy):
@@ -615,7 +557,7 @@ class metaclass(object):
         return self.mcls(name, bases, ns)
 
 
-@metaclass(stateful_proxy_meta)
+@metaclass(proxy_meta)
 class proxy(proxy_base):
     """
     A mostly transparent proxy type
@@ -675,6 +617,11 @@ class proxy(proxy_base):
         >>> prox
         ['nyn zn xbgn', 'n xbg zn nyr']
     """
+    # Registry of known typed_proxy_meta objects
+    _m_registry = {}
+
+    # There is a corresponding _c_registry but it is reset for each proxy
+    # subclass by proxy_meta.
 
     def __new__(proxy_cls, proxiee, *args, **kwargs):
         """
@@ -683,24 +630,41 @@ class proxy(proxy_base):
         :param proxiee:
             The object to proxy
         :returns:
-            An instance of new subclass of ``proxy``, called ``boundproxy``
-            that uses a new meta-class that lexically bounds the ``proxiee``
-            argument. The new sub-class has a different implementation of
-            ``__new__`` and can be instantiated without additional arguments.
+            An instance of new subclass of ``proxy`` with injected meta-class
+            proxy_meta[cls] where cls is the type of proxiee.
         """
-        _logger.debug("__new__ on proxy with proxiee: %r", proxiee)
-        boundproxy_meta = make_boundproxy_meta(proxiee)
+        _logger.debug(
+            "__new__ on %s with proxiee: %r (args: %r, kwargs %r)",
+            proxy_cls.__name__, proxiee, args, kwargs)
+        proxiee_cls = type(proxiee)
+        if proxiee_cls not in proxy_cls._m_registry:
+            typed_proxy_meta = make_typed_proxy_meta(proxiee_cls)
+            proxy_cls._m_registry[proxiee_cls] = typed_proxy_meta
+        else:
+            typed_proxy_meta = proxy_cls._m_registry[proxiee_cls]
+        if proxiee_cls not in proxy_cls._c_registry:
+            typed_proxy_cls = metaclass(typed_proxy_meta)(
+                proxy_cls, str('{}[{}]').format(
+                    proxy_cls.__name__, proxiee_cls.__name__))
+            proxy_cls._c_registry[proxiee_cls] = typed_proxy_cls
+        else:
+            typed_proxy_cls = proxy_cls._c_registry[proxiee_cls]
+        # XXX: This somehow magically calls __init__(*args, **kwargs)
+        proxy_obj = object.__new__(typed_proxy_cls)
+        state = proxy_state_namespace(proxy_obj)
+        state._original = proxiee
+        _logger.debug("__new__ on %s is about to return", proxy_cls.__name__)
+        return proxy_obj
 
-        @metaclass(boundproxy_meta)
-        class boundproxy(proxy_cls):
+    def __init__(proxy_obj, proxiee):
+        """
+        Initialize a fresh proxy instance specific to ``proxiee``
 
-            def __new__(boundproxy_cls):
-                _logger.debug("__new__ on boundproxy %r", boundproxy_cls)
-                proxy_obj = object.__new__(boundproxy_cls)
-                proxy_state = proxy_state_namespace(proxy_obj)
-                type(proxy_obj).__proxy_state__ = proxy_state
-                return proxy_obj
-        return boundproxy()
+        :param proxiee:
+            The object to proxy
+        """
+        _logger.debug("__init__ on %s with proxiee: %r",
+                      type(proxy_obj).__name__, proxiee)
 
     @staticmethod
     def direct(fn):
@@ -764,7 +728,8 @@ class proxy(proxy_base):
             >>> l
             [42]
         """
-        return _get_proxiee(proxy_obj)
+        state = proxy_state_namespace(proxy_obj)
+        return state._original
 
     @staticmethod
     def state(proxy_obj):
@@ -795,7 +760,8 @@ class proxy(proxy_base):
             >>> proxy.state(life).foo
             True
         """
-        return type(proxy_obj).__proxy_state__
+        return proxy_state_namespace(proxy_obj)
+
 
 # 1.0 backwards-compatibility aliases
 unproxied = proxy.direct

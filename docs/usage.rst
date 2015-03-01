@@ -17,7 +17,7 @@ Internals
     :special-members:
     :undoc-members:
 
-.. autofunction:: padme.make_boundproxy_meta
+.. autofunction:: padme.make_typed_proxy_meta
 
 .. autoclass:: padme.proxy_base
     :members:

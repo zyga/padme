@@ -14,6 +14,8 @@ History
   :meth:`~padme.proxy.original()` function.
 * Add support for accessing proxy state with the new
   :meth:`~padme.proxy.state()` function.
+* De-couple proxy classes from proxied objects, much more lightweight proxy
+  design is possible this way (less objects, lower cost to create each new proxy).
 
 1.0 (2014-02-11)
 ----------------
