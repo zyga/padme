@@ -722,6 +722,7 @@ class proxy(proxy_base):
         documentation of the :mod:`padme` module.
         """
         fn.unproxied = True
+        _logger.debug("function %r marked as unproxied/direct", fn)
         return fn
 
     @staticmethod
