@@ -16,8 +16,9 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Padme.  If not, see <http://www.gnu.org/licenses/>.
 """
-:mod:`padme.tests` -- tests for padme
-=====================================
+:mod:`padme.tests` -- tests for padme.
+
+======================================
 
 This package contains unit tests for padme. You don't want to use it directly
 and it can get changed at any time without notice.
