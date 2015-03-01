@@ -274,6 +274,10 @@ def _get_proxiee(proxy):
     return type(proxy).__proxiee__
 
 
+def _get_unproxied(proxy):
+    return type(proxy).__unproxied__
+
+
 class proxy_base(object):
     """
     Base class for all proxies.
@@ -398,7 +402,7 @@ class proxy_base(object):
         return getattr(proxiee, name)
 
     def __getattribute__(self, name):
-        if name not in type(self).__unproxied__:
+        if name not in _get_unproxied(self):
             proxiee = _get_proxiee(self)
             _logger.debug("__getattribute__ %r on proxiee (%r)", name, proxiee)
             return getattr(proxiee, name)
@@ -407,7 +411,7 @@ class proxy_base(object):
             return object.__getattribute__(self, name)
 
     def __setattr__(self, name, value):
-        if name not in type(self).__unproxied__:
+        if name not in _get_unproxied(self):
             proxiee = _get_proxiee(self)
             _logger.debug("__setattr__ %r on proxiee (%r)", name, proxiee)
             setattr(proxiee, name, value)
@@ -416,8 +420,7 @@ class proxy_base(object):
             object.__setattr__(self, name, value)
 
     def __delattr__(self, name):
-        cls = type(self)
-        if name not in cls.__unproxied__:
+        if name not in _get_unproxied(self):
             proxiee = _get_proxiee(self)
             _logger.debug("__delattr__ %r on proxiee (%r)", name, proxiee)
             delattr(proxiee, name)
