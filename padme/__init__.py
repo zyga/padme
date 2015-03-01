@@ -221,9 +221,22 @@ class proxy_meta(type):
             _logger.debug(
                 "proxy type %r will pass-thru %r", name, unproxied_set)
         ns['__unproxied__'] = frozenset(unproxied_set)
-        ns['__proxy_state__'] = None
         return super(proxy_meta, mcls).__new__(mcls, name, bases, ns)
 
+
+class stateful_proxy_meta(proxy_meta):
+    """
+    Meta-class for all proxy types
+
+    This meta-class is responsible for gathering the __unproxied__ attributes
+    on each created class. The attribute is a frozenset of names that will not
+    be forwarded to the ``proxiee`` but instead will be looked up on the proxy
+    itself.
+    """
+
+    def __new__(mcls, name, bases, ns):
+        ns['__proxy_state__'] = None
+        return super(stateful_proxy_meta, mcls).__new__(mcls, name, bases, ns)
 
 def make_boundproxy_meta(proxiee):
     """
@@ -233,11 +246,11 @@ def make_boundproxy_meta(proxiee):
         The object that will be proxied
     :returns:
         A new meta-class that lexically wraps ``proxiee`` and ``proxiee_cls``
-        and subclasses :class:`proxy_meta`.
+        and subclasses :class:`stateful_proxy_meta`.
     """
     proxiee_cls = type(proxiee)
 
-    class boundproxy_meta(proxy_meta):
+    class boundproxy_meta(stateful_proxy_meta):
         """
         Meta-class for all bound proxies.
 
@@ -554,7 +567,7 @@ class metaclass(object):
         return self.mcls(name, bases, ns)
 
 
-@metaclass(proxy_meta)
+@metaclass(stateful_proxy_meta)
 class proxy(proxy_base):
     """
     A mostly transparent proxy type
