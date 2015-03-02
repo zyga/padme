@@ -35,6 +35,22 @@ try:
 except ImportError:
     import unittest2 as unittest
     import mock
+    # Bug in mock 1.0.1 makes truediv broken.
+    # https://code.google.com/p/mock/issues/detail?id=247
+    if sys.version_info[0] == 3 and mock.__version__ == '1.0.1':
+        mock._all_magics.add('__truediv__')
+        mock._all_magics.add('__rtruediv__')
+        mock._all_magics.add('__itruediv__')
+        mock._all_magics.remove('__div__')
+        mock._all_magics.remove('__rdiv__')
+        mock._all_magics.remove('__idiv__')
+        # We need to patch both _magics and _all_magics
+        mock._magics.add('__truediv__')
+        mock._magics.add('__rtruediv__')
+        mock._magics.add('__itruediv__')
+        mock._magics.remove('__div__')
+        mock._magics.remove('__rdiv__')
+        mock._magics.remove('__idiv__')
 
 from padme import _logger
 from padme import proxy
