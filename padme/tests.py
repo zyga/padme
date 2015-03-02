@@ -29,10 +29,10 @@ import doctest
 import operator
 import sys
 
-try:
+if sys.version_info[0:2] >= (3, 4):
     import unittest
     from unittest import mock
-except ImportError:
+else:
     import unittest2 as unittest
     import mock
     # Bug in mock 1.0.1 makes truediv broken.

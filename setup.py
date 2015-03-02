@@ -59,6 +59,6 @@ setup(
     ],
     tests_require=([
         'unittest2' if sys.version_info[0] == 2 else 'unittest2py3k',
-        'mock'] if sys.version_info[:2] <= (3, 2) else None),
+        'mock'] if sys.version_info[:2] <= (3, 3) else None),
     test_suite='padme.tests',
 )
