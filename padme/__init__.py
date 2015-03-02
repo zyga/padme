@@ -16,8 +16,9 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Padme.  If not, see <http://www.gnu.org/licenses/>.
 """
-:mod:`padme` -- a mostly transparent proxy class for Python
-===========================================================
+:mod:`padme` -- a mostly transparent proxy class for Python.
+
+============================================================
 
 Padme, named after the Star Wars (tm) character, is a library for creating
 proxy objects out of any other python object.
@@ -194,12 +195,13 @@ _logger = logging.getLogger("padme")
 __author__ = 'Zygmunt Krynicki'
 __email__ = 'zygmunt.krynicki@canonical.com'
 __version__ = '1.0'
-__all__ = ['proxy']
+__all__ = ('proxy', )
 
 
 class proxy_meta(type):
+
     """
-    Meta-class for all proxy types
+    Meta-class for all proxy types.
 
     This meta-class is responsible for gathering the __unproxied__ attributes
     on each created class. The attribute is a frozenset of names that will not
@@ -229,7 +231,8 @@ class proxy_meta(type):
 
 def make_typed_proxy_meta(proxiee_cls):
     """
-    Make a new proxy meta-class for the specified class of proxiee objects
+
+    Make a new proxy meta-class for the specified class of proxiee objects.
 
     .. note::
 
@@ -279,6 +282,7 @@ def _get_unproxied(proxy):
 
 
 class proxy_base(object):
+
     """
     Base class for all proxies.
 
@@ -297,6 +301,7 @@ class proxy_base(object):
     lookup`` for a rationale of why we have all those dunder methods while
     still having __getattribute__()
     """
+
     # NOTE: the order of methods below matches that of ``pydoc3
     # SPECIALMETHODS``. The "N/A to instances" text means that it makes no
     # sense to add proxy support to the specified method because that method
@@ -309,9 +314,12 @@ class proxy_base(object):
 
     def __del__(self):
         """
-        NOTE: this method is handled specially since it must be called
-        after an object becomes unreachable. As long as the proxy object
-        itself exits, it holds a strong reference to the original object.
+        No-op object delete method.
+
+        .. note::
+            This method is handled specially since it must be called after an
+            object becomes unreachable. As long as the proxy object itself
+            exits, it holds a strong reference to the original object.
         """
 
     def __repr__(self):
@@ -508,6 +516,7 @@ class proxy_base(object):
 
 
 class proxy_state(object):
+
     """
     Support class for working with proxy state.
 
@@ -526,8 +535,9 @@ class proxy_state(object):
 
 
 class metaclass(object):
+
     """
-    Support decorator for Python-agnostic metaclass injection.
+    Support decorator for Python-agnostic meta-class injection.
 
     The following snippet illustrates how to use this decorator:
 
@@ -559,8 +569,9 @@ class metaclass(object):
 
 @metaclass(proxy_meta)
 class proxy(proxy_base):
+
     """
-    A mostly transparent proxy type
+    A mostly transparent proxy type.
 
     The proxy class can be used in two different ways. First, as a callable
     ``proxy(obj)``. This simply returns a proxy for a single object.
@@ -617,6 +628,7 @@ class proxy(proxy_base):
         >>> prox
         ['nyn zn xbgn', 'n xbg zn nyr']
     """
+
     # Registry of known typed_proxy_meta objects
     _m_registry = {}
 
@@ -625,7 +637,7 @@ class proxy(proxy_base):
 
     def __new__(proxy_cls, proxiee, *args, **kwargs):
         """
-        Create a new instance of ``proxy()`` wrapping ``proxiee``
+        Create a new instance of ``proxy()`` wrapping ``proxiee``.
 
         :param proxiee:
             The object to proxy
@@ -658,7 +670,7 @@ class proxy(proxy_base):
 
     def __init__(proxy_obj, proxiee):
         """
-        Initialize a fresh proxy instance specific to ``proxiee``
+        Initialize a fresh proxy instance specific to ``proxiee``.
 
         :param proxiee:
             The object to proxy
@@ -696,7 +708,7 @@ class proxy(proxy_base):
     @staticmethod
     def original(proxy_obj):
         """
-        Return the :term:`proxiee` hidden behind the given proxy
+        Return the :term:`proxiee` hidden behind the given proxy.
 
         :param proxy:
             An instance of :class:`proxy` or its subclass.

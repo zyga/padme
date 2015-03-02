@@ -18,6 +18,8 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Padme.  If not, see <http://www.gnu.org/licenses/>.
 """
+Example for using ``proxy()`` to compute checksum of written data.
+
 This example shows how one can take and existing object which is not easy to
 subclass correctly (unless you know the internals of the python io stack at the
 particular version you are interested in) and uses a proxy to intercept the
@@ -40,8 +42,9 @@ from padme import proxy
 
 
 class written_hash_proxy(proxy):
+
     """
-    Proxy for file-like objects that maintain a hash of written data
+    Proxy for file-like objects that maintain a hash of written data.
 
     For example, this allows to substitute sys.stdout with a version
     that keeps track of the hash of everything written.
@@ -65,6 +68,16 @@ class written_hash_proxy(proxy):
     """
 
     def __init__(self, proxiee, name='md5'):
+        """
+        Initialize a fresh written_hash_proxy.
+
+        :param proxiee:
+            The object that the proxy will wrap (ignored)
+        :param name:
+            Name of the hashing algorithm to use.
+
+        This method just sets up the desired digest object.
+        """
         # Use a proxy.state(self) to create a state attribute unique to this
         # proxy object and store the hash of the data written so far. This
         # state attribute will never clash with anything that the original
@@ -73,15 +86,29 @@ class written_hash_proxy(proxy):
 
     @proxy.direct
     def write(self, data):
-        # Intercept the write method (that's what @unproxied does) and both
-        # write the data using the original write method (using
-        # proxiee(self).write) and update the hash of the data written so far
-        # (using proxy.state(self).digest).
+        """
+        Intercepted method for writing data.
+
+        :param data:
+            Data to write
+        :returns:
+            Whatever the original method returns
+        :raises:
+            Whatever the original method raises
+
+        This method updates the internal digest object with with the new data
+        and then proceeds to call the original write method.
+        """
+        # Intercept the write method (that's what @direct does) and both write
+        # the data using the original write method (using proxiee(self).write)
+        # and update the hash of the data written so far (using
+        # proxy.state(self).digest).
         proxy.state(self).digest.update(data)
         return proxy.original(self).write(data)
 
 
 def main():
+    """ Main function of this example. """
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--digest', default="md5", help="Digest to use",
