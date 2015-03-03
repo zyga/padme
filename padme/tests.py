@@ -29,6 +29,10 @@ import doctest
 import operator
 import sys
 
+from padme import _logger
+from padme import proxy
+from padme import unproxied
+
 if sys.version_info[0:2] >= (3, 4):
     import unittest
     from unittest import mock
@@ -58,9 +62,6 @@ if sys.version_info[0] == 3 and '__truediv__' not in mock._all_magics:
 if 'divmod' not in mock.numerics:
     mock._magics.add('__rdivmod__')
     mock._all_magics.add('__rdivmod__')
-from padme import _logger
-from padme import proxy
-from padme import unproxied
 
 
 # XXX: Set to True for revelation
@@ -358,7 +359,311 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(self.proxy.__contains__(item), item in self.obj)
         self.assertEqual(self.proxy.__contains__(item), True)
 
-    # TODO, tests and implementation for all the numeric methods
+    def test_add(self):
+        other = mock.MagicMock()
+        self.assertEqual(self.proxy + other, self.obj + other)
+        self.assertEqual(self.proxy.__add__(other), self.obj + other)
+        self.assertEqual(proxy(4.5) + 2, 6.5)
+        self.assertEqual(proxy(5) + 2, 7)
+        with self.assertRaises(TypeError):
+            proxy("foo") + 2
+        self.assertEqual(proxy("foo") + "bar", "foobar")
+
+    def test_sub(self):
+        other = mock.MagicMock()
+        self.assertEqual(self.proxy - other, self.obj - other)
+        self.assertEqual(self.proxy.__sub__(other), self.obj - other)
+        self.assertEqual(proxy(4.5) - 2, 2.5)
+        self.assertEqual(proxy(5) - 2, 3)
+        with self.assertRaises(TypeError):
+            proxy("foo") - 2
+
+    def test_mul(self):
+        other = mock.MagicMock()
+        self.assertEqual(self.proxy * other, self.obj * other)
+        self.assertEqual(self.proxy.__mul__(other), self.obj * other)
+        self.assertEqual(proxy(4.5) * 2, 9.0)
+        self.assertEqual(proxy(5) * 2, 10)
+        self.assertEqual(proxy("foo") * 2, "foofoo")
+
+    @unittest.skipUnless(sys.version_info[0] == 2, "requires python 2")
+    def test_div(self):
+        other = mock.MagicMock()
+        self.assertEqual(operator.div(self.proxy, other),
+                         operator.div(self.obj, other))
+        self.assertEqual(self.proxy.__div__(other),
+                         operator.div(self.obj, other))
+        self.assertEqual(operator.div(proxy(4.5), 2), 2.25)
+        self.assertEqual(operator.div(proxy(5), 2), 2)
+
+    def test_truediv(self):
+        other = mock.MagicMock()
+        self.assertEqual(operator.truediv(self.proxy, other),
+                         operator.truediv(self.obj, other))
+        self.assertEqual(self.proxy.__truediv__(other),
+                         operator.truediv(self.obj, other))
+        self.assertEqual(operator.truediv(proxy(4.5), 2), 2.25)
+        self.assertEqual(operator.truediv(proxy(5), 2), 2.5)
+
+    def test_floordiv(self):
+        other = mock.MagicMock()
+        self.assertEqual(self.proxy // other, self.obj // other)
+        self.assertEqual(self.proxy.__floordiv__(other), self.obj // other)
+        self.assertEqual(proxy(4.5) // 2, 2)
+        self.assertEqual(proxy(5) // 2, 2)
+
+    def test_mod(self):
+        other = mock.MagicMock()
+        self.assertEqual(self.proxy % other, self.obj % other)
+        self.assertEqual(self.proxy.__mod__(other), self.obj % other)
+        self.assertEqual(proxy(4.5) % 2, 0.5)
+        self.assertEqual(proxy(5) % 2, 1)
+
+    def test_divmod(self):
+        other = mock.MagicMock()
+        self.assertEqual(divmod(self.proxy, other), divmod(self.obj, other))
+        self.assertEqual(self.proxy.__divmod__(other), divmod(self.obj, other))
+        self.assertEqual(divmod(proxy(4.5), 2), (2, 0.5))
+        self.assertEqual(divmod(proxy(5), 2), (2, 1))
+
+    def test_pow(self):
+        other = mock.MagicMock()
+        self.assertEqual(self.proxy ** other, self.obj ** other)
+        self.assertEqual(self.proxy.__pow__(other), self.obj ** other)
+        self.assertEqual(pow(self.proxy, other), self.obj ** other)
+        self.assertEqual(pow(proxy(2), 3), 8)
+
+    def test_lshift(self):
+        other = mock.MagicMock()
+        self.assertEqual(self.proxy << other, self.obj << other)
+        self.assertEqual(self.proxy.__lshift__(other), self.obj << other)
+        self.assertEqual(proxy(1) << 3, 8)
+
+    def test_rshift(self):
+        other = mock.MagicMock()
+        self.assertEqual(self.proxy >> other, self.obj >> other)
+        self.assertEqual(self.proxy.__rshift__(other), self.obj >> other)
+        self.assertEqual(proxy(8) >> 3, 1)
+
+    def test_and(self):
+        other = mock.MagicMock()
+        self.assertEqual(self.proxy & other, self.obj & other)
+        self.assertEqual(self.proxy.__and__(other), self.obj & other)
+        self.assertEqual(proxy(7) & 4, 4)
+
+    def test_xor(self):
+        other = mock.MagicMock()
+        self.assertEqual(self.proxy ^ other, self.obj ^ other)
+        self.assertEqual(self.proxy.__xor__(other), self.obj ^ other)
+        self.assertEqual(proxy(1) ^ 1, 0)
+        self.assertEqual(proxy(1) ^ 0, 1)
+        self.assertEqual(proxy(0) ^ 0, 0)
+        self.assertEqual(proxy(0) ^ 1, 1)
+
+    def test_or(self):
+        other = mock.MagicMock()
+        self.assertEqual(self.proxy | other, self.obj | other)
+        self.assertEqual(self.proxy.__or__(other), self.obj | other)
+        self.assertEqual(proxy(1) | 2, 3)
+
+    def test_radd(self):
+        """ Verify that __radd__ is redirected to the proxiee.  """
+        # NOTE: ``other`` is anything other than MagicMock to let
+        # the reverse methods do their work. The same rule applies
+        # to all the other test_r* methods so it won't be repeated
+        # there.
+        other = mock.Mock()
+        self.assertEqual(other + self.proxy, other + self.obj)
+        self.assertEqual(self.proxy.__radd__(other), other + self.obj)
+        self.assertEqual(4.5 + proxy(2), 6.5)
+        self.assertEqual(5 + proxy(2), 7)
+        with self.assertRaises(TypeError):
+            2 + proxy("foo")
+        self.assertEqual("foo" + proxy("bar"), "foobar")
+        self.assertEqual([1, 2, 3] + proxy([4, 5]), [1, 2, 3, 4, 5])
+
+    def test_rsub(self):
+        """ Verify that __rsub__ is redirected to the proxiee. """
+        other = mock.Mock()
+        self.assertEqual(other - self.proxy, other - self.obj)
+        self.assertEqual(self.proxy.__rsub__(other), other - self.obj)
+        self.assertEqual(4.5 - proxy(2), 2.5)
+        self.assertEqual(5 - proxy(2), 3)
+        with self.assertRaises(TypeError):
+            "foo" - proxy(2)
+
+    def test_rmul(self):
+        """ Verify that __rmul__ is redirected to the proxiee. """
+        other = mock.Mock()
+        self.assertEqual(other * self.proxy, other * self.obj)
+        self.assertEqual(self.proxy.__rmul__(other), other * self.obj)
+        self.assertEqual(4.5 * proxy(2), 9.0)
+        self.assertEqual(5 * proxy(2), 10)
+        self.assertEqual("foo" * proxy(2), "foofoo")
+
+    @unittest.skipUnless(sys.version_info[0] == 2, "requires python 2")
+    def test_rdiv(self):
+        """ Verify that __rdiv__ is redirected to the proxiee. """
+        other = mock.Mock()
+        self.assertEqual(operator.div(other, self.proxy),
+                         operator.div(other, self.obj))
+        self.assertEqual(self.proxy.__rdiv__(other),
+                         operator.div(other, self.obj))
+        self.assertEqual(operator.div(4.5, proxy(2)), 2.25)
+        self.assertEqual(operator.div(5, proxy(2)), 2)
+
+    def test_rtruediv(self):
+        """ Verify that __rtruediv__ is redirected to the proxiee. """
+        other = mock.Mock()
+        self.assertEqual(operator.truediv(other, self.proxy),
+                         operator.truediv(other, self.obj))
+        self.assertEqual(self.proxy.__rtruediv__(other),
+                         operator.truediv(other, self.obj))
+        self.assertEqual(operator.truediv(4.5, proxy(2)), 2.25)
+        self.assertEqual(operator.truediv(5, proxy(2)), 2.5)
+
+    def test_rfloordiv(self):
+        """ Verify that __rfloordiv__ is redirected to the proxiee. """
+        other = mock.Mock()
+        self.assertEqual(other // self.proxy, other // self.obj)
+        self.assertEqual(self.proxy.__rfloordiv__(other), other // self.obj)
+        self.assertEqual(4.5 // proxy(2), 2)
+        self.assertEqual(5 // proxy(2), 2)
+
+    def test_rmod(self):
+        """ Verify that __rmod__ is redirected to the proxiee. """
+        other = mock.Mock()
+        self.assertEqual(other % self.proxy, other % self.obj)
+        self.assertEqual(self.proxy.__rmod__(other), other % self.obj)
+        self.assertEqual(4.5 % proxy(2), 0.5)
+        self.assertEqual(5 % proxy(2), 1)
+
+    def test_rdivmod(self):
+        """ Verify that __rdivmod__ is redirected to the proxiee. """
+        other = mock.Mock()
+        self.assertEqual(divmod(other, self.proxy), divmod(other, self.obj))
+        self.assertEqual(
+            self.proxy.__rdivmod__(other), divmod(other, self.obj))
+        self.assertEqual(divmod(4.5, proxy(2)), (2, 0.5))
+        self.assertEqual(divmod(5, proxy(2)), (2, 1))
+
+    def test_rpow(self):
+        """ Verify that __rpow__ is redirected to the proxiee. """
+        other = mock.Mock()
+        self.assertEqual(other ** self.proxy, other ** self.obj)
+        self.assertEqual(self.proxy.__rpow__(other), other ** self.obj)
+        self.assertEqual(pow(other, self.proxy), other ** self.obj)
+        self.assertEqual(pow(2, proxy(3)), 8)
+        with self.assertRaises(TypeError):
+            # __rpow__ is not called for the three-argument version of pow()
+            self.assertEqual(pow(2, proxy(10), 1000), 24)
+
+    def test_rlshift(self):
+        """ Verify that __rlshift__ is redirected to the proxiee. """
+        other = mock.Mock()
+        self.assertEqual(other << self.proxy, other << self.obj)
+        self.assertEqual(self.proxy.__rlshift__(other), other << self.obj)
+        self.assertEqual(1 << proxy(3), 8)
+
+    def test_rrshift(self):
+        """ Verify that __rrshift__ is redirected to the proxiee. """
+        other = mock.Mock()
+        self.assertEqual(other >> self.proxy, other >> self.obj)
+        self.assertEqual(self.proxy.__rrshift__(other), other >> self.obj)
+        self.assertEqual(8 >> proxy(3), 1)
+
+    def test_rand(self):
+        """ Verify that __rand__ is redirected to the proxiee. """
+        other = mock.Mock()
+        self.assertEqual(other & self.proxy, other & self.obj)
+        self.assertEqual(self.proxy.__rand__(other), other & self.obj)
+        self.assertEqual(7 & proxy(4), 4)
+
+    def test_rxor(self):
+        """ Verify that __rxor__ is redirected to the proxiee. """
+        other = mock.Mock()
+        self.assertEqual(other ^ self.proxy, other ^ self.obj)
+        self.assertEqual(self.proxy.__rxor__(other), other ^ self.obj)
+        self.assertEqual(1 ^ proxy(1), 0)
+        self.assertEqual(1 ^ proxy(0), 1)
+        self.assertEqual(0 ^ proxy(0), 0)
+        self.assertEqual(0 ^ proxy(1), 1)
+
+    def test_ror(self):
+        """ Verify that __ror__ is redirected to the proxiee. """
+        other = mock.Mock()
+        self.assertEqual(other | self.proxy, other | self.obj)
+        self.assertEqual(self.proxy.__ror__(other), other | self.obj)
+        self.assertEqual(1 | proxy(2), 3)
+
+    def test_iadd__via_operator(self):
+        """ Verify that += is redirected to the proxiee. """
+        other = mock.MagicMock()
+        proxy_old = self.proxy
+        self.proxy += other
+        self.obj.__iadd__.assert_called_with(other)
+        self.assertTrue(issubclass(type(self.proxy), proxy))
+        self.assertIs(self.proxy, proxy_old)
+
+    def test_iadd__via_dunder(self):
+        """ Verify that __iadd__ is redirected to the proxiee. """
+        other = mock.MagicMock()
+        proxy_old = self.proxy
+        self.proxy = self.proxy.__iadd__(other)
+        self.obj.__iadd__.assert_called_with(other)
+        self.assertTrue(issubclass(type(self.proxy), proxy))
+        self.assertIs(self.proxy, proxy_old)
+
+    def test_iadd__on_int__via_operator(self):
+        """ Verify that += works on proxy[int]. """
+        # int is immutable so += actually works using the + operator
+        a = proxy(2)
+        a += 2
+        self.assertEqual(a, 4)
+        self.assertTrue(issubclass(type(a), proxy))
+
+    def test_iadd__on_str__via_operator(self):
+        """ Verify that += works on proxy[str]. """
+        # str is immutable so += actually works using the + operator
+        a = proxy("hello")
+        a += " world"
+        self.assertEqual(a, "hello world")
+        self.assertTrue(issubclass(type(a), proxy))
+
+    def test_iadd__on_list__via_operator(self):
+        """ Verify that += works on proxy[list]. """
+        # list is mutable so += is implemented directly
+        a = proxy(['first'])
+        a += ['second']
+        self.assertEqual(a, ['first', 'second'])
+        self.assertTrue(issubclass(type(a), proxy))
+
+    def test_iadd__on_int__via_dunder(self):
+        """ Verify that __iadd__ doesn't exist on proxy[int]. """
+        a = 2
+        with self.assertRaises(AttributeError):
+            a.__iadd__(2)
+        b = proxy(2)
+        with self.assertRaises(AttributeError):
+            b.__iadd__(2)
+
+    def test_iadd__on_str__via_dunder(self):
+        """ Verify that __iadd__ doesn't exist on proxy[str]. """
+        a = "hello"
+        with self.assertRaises(AttributeError):
+            a.__iadd__(" world")
+        b = proxy("hello")
+        with self.assertRaises(AttributeError):
+            b.__iadd__(" world")
+
+    def test_iadd__on_list__via_dunder(self):
+        """ Verify that __iadd__ works on proxy[list]. """
+        a = proxy(['first'])
+        b = a.__iadd__(['second'])
+        self.assertEqual(b, ['first', 'second'])
+        self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
+        self.assertIs(a, b)
 
     def test_context_manager_methods_v1(self):
         """ Verify that __enter__ and __exit__ are redirected. """
@@ -386,7 +691,7 @@ class proxy_as_function(unittest.TestCase):
         """ verify that hasattr() behaves the same for original and proxy. """
         class C(object):
             pass
-        special_methods = '''
+        special_methods = str('''
             __del__
             __repr__
             __str__
@@ -420,9 +725,62 @@ class proxy_as_function(unittest.TestCase):
             __iter__
             __reversed__
             __contains__
+            __add__
+            __sub__
+            __mul__
+            __floordiv__
+            __mod__
+            __divmod__
+            __pow__
+            __lshift__
+            __rshift__
+            __and__
+            __xor__
+            __or__
+            __div__
+            __truediv__
+            __radd__
+            __rsub__
+            __rmul__
+            __rdiv__
+            __rtruediv__
+            __rfloordiv__
+            __rmod__
+            __rdivmod__
+            __rpow__
+            __rlshift__
+            __rrshift__
+            __rand__
+            __rxor__
+            __ror__
+            __iadd__
+            __isub__
+            __imul__
+            __idiv__
+            __itruediv__
+            __ifloordiv__
+            __imod__
+            __ipow__
+            __ilshift__
+            __irshift__
+            __iand__
+            __ixor__
+            __ior__
+            __neg__
+            __pos__
+            __abs__
+            __invert__
+            __complex__
+            __int__
+            __long__
+            __float__
+            __oct__
+            __hex__
+            __index__
+            __coerce__
             __enter__
             __exit__
-        '''.split()
+        ''').split()
         for obj in [C(), 42, property(lambda x: x), int, None]:
             self.obj = obj
             self.proxy = proxy(self.obj)

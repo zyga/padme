@@ -188,14 +188,15 @@ to allow all of Padme to be used from the one :class:`proxy` class.
 from __future__ import print_function, absolute_import, unicode_literals
 
 import logging
+import operator
 import sys
-
-_logger = logging.getLogger("padme")
 
 __author__ = 'Zygmunt Krynicki'
 __email__ = 'zygmunt.krynicki@canonical.com'
 __version__ = '1.0'
-__all__ = ('proxy', )
+__all__ = (str('proxy'), )
+
+_logger = logging.getLogger("padme")
 
 
 class proxy_meta(type):
@@ -211,8 +212,8 @@ class proxy_meta(type):
 
     def __new__(mcls, name, bases, ns, *args, **kwargs):
         _logger.debug(
-            "__new__ on proxy_meta with name: %r, bases: %r"
-            " (args: %r, kwargs %r)", name, bases, args, kwargs)
+            "%s.__new__ with name: %r, bases: %r (args: %r, kwargs %r)",
+            mcls.__name__, name, bases, args, kwargs)
         unproxied_set = set()
         for base in bases:
             if hasattr(base, '__unproxied__'):
@@ -224,9 +225,26 @@ class proxy_meta(type):
             _logger.debug(
                 "proxy type %r will pass-thru %r", name, unproxied_set)
         ns['__unproxied__'] = frozenset(unproxied_set)
-        _logger.debug("injecting fresh _c_registry into %s", name)
+        # _logger.debug("injecting fresh _c_registry into %s", name)
         ns['_c_registry'] = {}
         return super(proxy_meta, mcls).__new__(mcls, name, bases, ns)
+
+    def __getitem__(proxy_cls, proxiee_cls):
+        if not isinstance(proxiee_cls, type):
+            raise ValueError("proxiee_cls must be a type")
+        if proxiee_cls not in proxy_cls._m_registry:
+            typed_proxy_meta = make_typed_proxy_meta(proxiee_cls)
+            proxy_cls._m_registry[proxiee_cls] = typed_proxy_meta
+        else:
+            typed_proxy_meta = proxy_cls._m_registry[proxiee_cls]
+        if proxiee_cls not in proxy_cls._c_registry:
+            typed_proxy_cls = metaclass(typed_proxy_meta)(
+                proxy_cls, str('{}[{}]').format(
+                    proxy_cls.__name__, proxiee_cls.__name__))
+            proxy_cls._c_registry[proxiee_cls] = typed_proxy_cls
+        else:
+            typed_proxy_cls = proxy_cls._c_registry[proxiee_cls]
+        return typed_proxy_cls
 
 
 def make_typed_proxy_meta(proxiee_cls):
@@ -274,11 +292,69 @@ def make_typed_proxy_meta(proxiee_cls):
 
 
 def _get_proxiee(proxy_obj):
-    return proxy_state(proxy_obj)._original
+    return object.__getattribute__(proxy_obj, '_original')
+
+
+def _set_proxiee(proxy_obj, proxiee):
+    return object.__setattr__(proxy_obj, '_original', proxiee)
 
 
 def _get_unproxied(proxy):
     return type(proxy).__unproxied__
+
+
+# All augmented assignment methods. We need to know those to let use intercept
+# __getattribute__ access to them. Normally it is safe to directly call methods
+# on the original object but augmented assignment a (op)= b actually changes a
+# and we need to make sure that a proxy object is returned there.
+_imethods = set([
+    '__iadd__',
+    '__isub__',
+    '__imul__',
+    '__itruediv__',
+    '__ifloordiv__',
+    '__imod__',
+    '__ipow__',
+    '__ilshift__',
+    '__irshift__',
+    '__iand__',
+    '__ixor__',
+    '__ior__',
+])
+if sys.version_info[0] == 2:
+    _imethods.add('__idiv__')
+
+_imethods = frozenset(_imethods)
+
+
+def _imethod(self, other, name, op):
+    """
+    Shared implementation of __iFUNC__ method.
+
+    :param self:
+        A proxy_base instance
+    :param other:
+        Any right-hand-side value
+    :param name:
+        Name of the __iFUNC__
+    :param op:
+        Appropriate operator.__iFUNC__ operator
+    :returns:
+        self
+    """
+    proxiee_old = proxiee_new = _get_proxiee(self)
+    _logger.debug("%s on proxiee (%r)", name, proxiee_old)
+    # NOTE: This _may_ or _may not be_ calling __iFUNC__
+    # as the proxiee may not support it in the first place
+    proxiee_new = op(proxiee_old, other)
+    if proxiee_new is not proxiee_old:
+        # NOTE: all of the augmented assignment methods handle the case where
+        # the __iFUNC__ method returns something other than self. To maintain
+        # the illusion that the proxy is not there the internal proxiee
+        # reference is changed to the new proxiee.
+        _logger.debug("%s sets new proxiee (%r)", name, proxiee_new)
+        _set_proxiee(self, proxiee_new)
+    return self
 
 
 class proxy_base(object):
@@ -410,13 +486,24 @@ class proxy_base(object):
         return getattr(proxiee, name)
 
     def __getattribute__(self, name):
-        if name not in _get_unproxied(self):
-            proxiee = _get_proxiee(self)
-            _logger.debug("__getattribute__ %r on proxiee (%r)", name, proxiee)
-            return getattr(proxiee, name)
-        else:
-            _logger.debug("__getattribute__ %r on proxy itself", name)
+        is_unproxied = name in _get_unproxied(self)
+        is_imethod = name in _imethods
+        if is_unproxied:
+            _logger.debug("%s.__getattribute__ %r on proxy itself (direct)",
+                          type(self).__name__, name)
             return object.__getattribute__(self, name)
+        elif is_imethod:
+            _logger.debug(
+                "%s.__getattribute__ %r on proxy itself (augmented"
+                " assignment)", type(self).__name__, name)
+            proxiee = _get_proxiee(self)
+            object.__getattribute__(proxiee, name)
+            return object.__getattribute__(self, name)
+        else:
+            proxiee = _get_proxiee(self)
+            _logger.debug("%s.__getattribute__ %r on proxiee (%r)",
+                          type(self).__name__, name, proxiee)
+            return getattr(proxiee, name)
 
     def __setattr__(self, name, value):
         if name not in _get_unproxied(self):
@@ -424,7 +511,7 @@ class proxy_base(object):
             _logger.debug("__setattr__ %r on proxiee (%r)", name, proxiee)
             setattr(proxiee, name, value)
         else:
-            _logger.debug("__setattr__ %r on proxy itself", name)
+            _logger.debug("__setattr__ %r on proxy itself (direct)", name)
             object.__setattr__(self, name, value)
 
     def __delattr__(self, name):
@@ -433,7 +520,7 @@ class proxy_base(object):
             _logger.debug("__delattr__ %r on proxiee (%r)", name, proxiee)
             delattr(proxiee, name)
         else:
-            _logger.debug("__delattr__ %r on proxy itself", name)
+            _logger.debug("__delattr__ %r on proxy itself (direct)", name)
             object.__delattr__(self, name)
 
     def __dir__(self):
@@ -502,7 +589,270 @@ class proxy_base(object):
         _logger.debug("__contains__ on proxiee (%r)", proxiee)
         return item in proxiee
 
-    # TODO: all numeric methods
+    # NOTE: __{get,set,del}slice__() methods are not implemented as they are
+    # not used anymore by anything, AFAIK
+
+    # all basic numeric methods
+
+    def __add__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__add__ on proxiee (%r)", proxiee)
+        return proxiee + other
+
+    def __sub__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__sub__ on proxiee (%r)", proxiee)
+        return proxiee - other
+
+    def __mul__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__mul__ on proxiee (%r)", proxiee)
+        return proxiee * other
+
+    if sys.version_info[0] == 2:
+        def __div__(self, other):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__div__ on proxiee (%r)", proxiee)
+            return operator.div(proxiee, other)
+
+    def __truediv__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__truediv__ on proxiee (%r)", proxiee)
+        return operator.truediv(proxiee, other)
+
+    def __floordiv__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__floordiv__ on proxiee (%r)", proxiee)
+        return proxiee // other
+
+    def __mod__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__mod__ on proxiee (%r)", proxiee)
+        return proxiee % other
+
+    def __divmod__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__divmod__ on proxiee (%r)", proxiee)
+        return divmod(proxiee, other)
+
+    def __pow__(self, other, modulo=None):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__pow__ on proxiee (%r)", proxiee)
+        return pow(proxiee, other, modulo)
+
+    def __lshift__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__lshift__ on proxiee (%r)", proxiee)
+        return proxiee << other
+
+    def __rshift__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rshift__ on proxiee (%r)", proxiee)
+        return proxiee >> other
+
+    def __and__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__and__ on proxiee (%r)", proxiee)
+        return proxiee & other
+
+    def __xor__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__xor__ on proxiee (%r)", proxiee)
+        return proxiee ^ other
+
+    def __or__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__or__ on proxiee (%r)", proxiee)
+        return proxiee | other
+
+    # all reversed numeric methods
+
+    def __radd__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__radd__ on proxiee (%r)", proxiee)
+        return other + proxiee
+
+    def __rsub__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rsub__ on proxiee (%r)", proxiee)
+        return other - proxiee
+
+    def __rmul__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rmul__ on proxiee (%r)", proxiee)
+        return other * proxiee
+
+    if sys.version_info[0] == 2:
+        def __rdiv__(self, other):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__rdiv__ on proxiee (%r)", proxiee)
+            return operator.__div__(other, proxiee)
+
+    def __rtruediv__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rtruediv__ on proxiee (%r)", proxiee)
+        return operator.__truediv__(other, proxiee)
+
+    def __rfloordiv__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rfloordiv__ on proxiee (%r)", proxiee)
+        return other // proxiee
+
+    def __rmod__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rmod__ on proxiee (%r)", proxiee)
+        return other % proxiee
+
+    def __rdivmod__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rdivmod__ on proxiee (%r)", proxiee)
+        return divmod(other, proxiee)
+
+    def __rpow__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rpow__ on proxiee (%r)", proxiee)
+        return pow(other, proxiee)
+
+    def __rlshift__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rlshift__ on proxiee (%r)", proxiee)
+        return other << proxiee
+
+    def __rrshift__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rrshift__ on proxiee (%r)", proxiee)
+        return other >> proxiee
+
+    def __rand__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rand__ on proxiee (%r)", proxiee)
+        return other & proxiee
+
+    def __rxor__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rxor__ on proxiee (%r)", proxiee)
+        return other ^ proxiee
+
+    def __ror__(self, other):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__rrshift__ on proxiee (%r)", proxiee)
+        return other | proxiee
+
+    # all augmented assignment numeric methods
+
+    def __iadd__(self, other):
+        return _imethod(self, other, '__iadd__', operator.iadd)
+
+    def __isub__(self, other):
+        return _imethod(self, other, '__isub__', operator.isub)
+
+    def __imul__(self, other):
+        return _imethod(self, other, '__imul__', operator.imul)
+
+    if sys.version_info[0] == 2:
+        def __idiv__(self, other):
+            return _imethod(self, other, '__idiv__', operator.idiv)
+
+    def __itruediv__(self, other):
+        return _imethod(self, other, '__itruediv__', operator.itruediv)
+
+    def __ifloordiv__(self, other):
+        return _imethod(self, other, '__ifloordiv__', operator.ifloordiv)
+
+    def __imod__(self, other):
+        return _imethod(self, other, '__imod__', operator.imod)
+
+    def __ipow__(self, other, modulo=None):
+        assert modulo is None
+        return _imethod(self, other, '__ipow__', operator.ipow)
+
+    def __ilshift__(self, other):
+        return _imethod(self, other, '__ilshift__', operator.ilshift)
+
+    def __irshift__(self, other):
+        return _imethod(self, other, '__irshift__', operator.irshift)
+
+    def __iand__(self, other):
+        return _imethod(self, other, '__iand__', operator.iand)
+
+    def __ixor__(self, other):
+        return _imethod(self, other, '__ixor__', operator.ixor)
+
+    def __ior__(self, other):
+        return _imethod(self, other, '__ior__', operator.ior)
+
+    # all miscellaneous numeric methods
+
+    def __neg__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__neg__ on proxiee (%r)", proxiee)
+        return - proxiee
+
+    def __pos__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__pos__ on proxiee (%r)", proxiee)
+        return + proxiee
+
+    def __abs__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__abs__ on proxiee (%r)", proxiee)
+        return abs(proxiee)
+
+    def __invert__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__invert__ on proxiee (%r)", proxiee)
+        return ~ proxiee
+
+    # Helpers for built-ins: complex(), int(), float() and round()
+
+    def __complex__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__complex__ on proxiee (%r)", proxiee)
+        return complex(proxiee)
+
+    def __int__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__int__ on proxiee (%r)", proxiee)
+        return int(proxiee)
+
+    if sys.version_info[0] == 2:
+        def __long__(self):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__long__ on proxiee (%r)", proxiee)
+            return long(proxiee)
+
+    def __float__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__float__ on proxiee (%r)", proxiee)
+        return float(proxiee)
+
+    if sys.version_info[0] == 3:
+        def __round__(self, n):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__float__ on proxiee (%r)", proxiee)
+            return round(proxiee, n)
+
+    if sys.version_info[0] == 2:
+        def __oct__(self):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__oct__ on proxiee (%r)", proxiee)
+            return oct(proxiee)
+
+        def __hex__(self):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__hex__ on proxiee (%r)", proxiee)
+            return hex(proxiee)
+
+    def __index__(self):
+        proxiee = _get_proxiee(self)
+        _logger.debug("__index__ on proxiee (%r)", proxiee)
+        return operator.index(proxiee)
+
+    if sys.version_info[0] == 2:
+        def __coerce__(self, other):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__coerce__ on proxiee (%r)", proxiee)
+            return coerce(proxiee, other)
 
     def __enter__(self):
         proxiee = _get_proxiee(self)
@@ -646,26 +996,16 @@ class proxy(proxy_base):
             proxy_meta[cls] where cls is the type of proxiee.
         """
         _logger.debug(
-            "__new__ on %s with proxiee: %r (args: %r, kwargs %r)",
+            "%s.__new__ with proxiee: %r (args: %r, kwargs %r)",
             proxy_cls.__name__, proxiee, args, kwargs)
         proxiee_cls = type(proxiee)
-        if proxiee_cls not in proxy_cls._m_registry:
-            typed_proxy_meta = make_typed_proxy_meta(proxiee_cls)
-            proxy_cls._m_registry[proxiee_cls] = typed_proxy_meta
-        else:
-            typed_proxy_meta = proxy_cls._m_registry[proxiee_cls]
-        if proxiee_cls not in proxy_cls._c_registry:
-            typed_proxy_cls = metaclass(typed_proxy_meta)(
-                proxy_cls, str('{}[{}]').format(
-                    proxy_cls.__name__, proxiee_cls.__name__))
-            proxy_cls._c_registry[proxiee_cls] = typed_proxy_cls
-        else:
-            typed_proxy_cls = proxy_cls._c_registry[proxiee_cls]
-        # XXX: This somehow magically calls __init__(*args, **kwargs)
+        typed_proxy_cls = proxy_cls[proxiee_cls]
         proxy_obj = object.__new__(typed_proxy_cls)
         state = proxy_state(proxy_obj)
+        # _logger.debug("%s.__new__ inserted _original into instance",
+        #               proxy_cls.__name__)
         state._original = proxiee
-        _logger.debug("__new__ on %s is about to return", proxy_cls.__name__)
+        # _logger.debug("%s.__new__ is about to return", proxy_cls.__name__)
         return proxy_obj
 
     def __init__(proxy_obj, proxiee):
@@ -675,8 +1015,8 @@ class proxy(proxy_base):
         :param proxiee:
             The object to proxy
         """
-        _logger.debug("__init__ on %s with proxiee: %r",
-                      type(proxy_obj).__name__, proxiee)
+        _logger.debug(
+            "%s.__init__ with proxiee: %r", type(proxy_obj).__name__, proxiee)
 
     @staticmethod
     def direct(fn):
