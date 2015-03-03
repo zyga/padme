@@ -38,6 +38,7 @@ else:
 
 
 # https://code.google.com/p/mock/issues/detail?id=247
+# or http://bugs.python.org/issue23569
 if sys.version_info[0] == 3 and '__div__' in mock._all_magics:
     mock._magics.remove('__div__')
     mock._magics.remove('__rdiv__')
