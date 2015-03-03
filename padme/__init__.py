@@ -667,7 +667,6 @@ class proxy(proxy_base):
             proxy_cls.__name__, proxiee, args, kwargs)
         proxiee_cls = type(proxiee)
         typed_proxy_cls = proxy_cls[proxiee_cls]
-        # XXX: This somehow magically calls __init__(*args, **kwargs)
         proxy_obj = object.__new__(typed_proxy_cls)
         state = proxy_state(proxy_obj)
         # _logger.debug("%s.__new__ inserted _original into instance",
