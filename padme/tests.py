@@ -52,6 +52,11 @@ if sys.version_info[0] == 3 and '__truediv__' not in mock._all_magics:
     mock._all_magics.add('__truediv__')
     mock._all_magics.add('__rtruediv__')
     mock._all_magics.add('__itruediv__')
+
+# http://bugs.python.org/issue23568
+if 'divmod' not in mock.numerics:
+    mock._magics.add('__rdivmod__')
+    mock._all_magics.add('__rdivmod__')
 from padme import _logger
 from padme import proxy
 from padme import unproxied
