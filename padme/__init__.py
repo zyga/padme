@@ -298,6 +298,30 @@ def _get_unproxied(proxy):
     return type(proxy).__unproxied__
 
 
+# All augmented assignment methods. We need to know those to let use intercept
+# __getattribute__ access to them. Normally it is safe to directly call methods
+# on the original object but augmented assignment a (op)= b actually changes a
+# and we need to make sure that a proxy object is returned there.
+_imethods = set([
+    '__iadd__',
+    '__isub__',
+    '__imul__',
+    '__itruediv__',
+    '__ifloordiv__',
+    '__imod__',
+    '__ipow__',
+    '__ilshift__',
+    '__irshift__',
+    '__iand__',
+    '__ixor__',
+    '__ior__',
+])
+if sys.version_info[0] == 2:
+    _imethods.add('__idiv__')
+
+_imethods = frozenset(_imethods)
+
+
 class proxy_base(object):
 
     """
@@ -427,13 +451,24 @@ class proxy_base(object):
         return getattr(proxiee, name)
 
     def __getattribute__(self, name):
-        if name not in _get_unproxied(self):
-            proxiee = _get_proxiee(self)
-            _logger.debug("__getattribute__ %r on proxiee (%r)", name, proxiee)
-            return getattr(proxiee, name)
-        else:
-            _logger.debug("__getattribute__ %r on proxy itself", name)
+        is_unproxied = name in _get_unproxied(self)
+        is_imethod = name in _imethods
+        if is_unproxied:
+            _logger.debug("%s.__getattribute__ %r on proxy itself (direct)",
+                          type(self).__name__, name)
             return object.__getattribute__(self, name)
+        elif is_imethod:
+            _logger.debug(
+                "%s.__getattribute__ %r on proxy itself (augmented"
+                " assignment)", type(self).__name__, name)
+            proxiee = _get_proxiee(self)
+            object.__getattribute__(proxiee, name)
+            return object.__getattribute__(self, name)
+        else:
+            proxiee = _get_proxiee(self)
+            _logger.debug("%s.__getattribute__ %r on proxiee (%r)",
+                          type(self).__name__, name, proxiee)
+            return getattr(proxiee, name)
 
     def __setattr__(self, name, value):
         if name not in _get_unproxied(self):
@@ -441,7 +476,7 @@ class proxy_base(object):
             _logger.debug("__setattr__ %r on proxiee (%r)", name, proxiee)
             setattr(proxiee, name, value)
         else:
-            _logger.debug("__setattr__ %r on proxy itself", name)
+            _logger.debug("__setattr__ %r on proxy itself (direct)", name)
             object.__setattr__(self, name, value)
 
     def __delattr__(self, name):
@@ -450,7 +485,7 @@ class proxy_base(object):
             _logger.debug("__delattr__ %r on proxiee (%r)", name, proxiee)
             delattr(proxiee, name)
         else:
-            _logger.debug("__delattr__ %r on proxy itself", name)
+            _logger.debug("__delattr__ %r on proxy itself (direct)", name)
             object.__delattr__(self, name)
 
     def __dir__(self):
