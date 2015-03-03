@@ -29,6 +29,10 @@ import doctest
 import operator
 import sys
 
+from padme import _logger
+from padme import proxy
+from padme import unproxied
+
 if sys.version_info[0:2] >= (3, 4):
     import unittest
     from unittest import mock
@@ -58,9 +62,6 @@ if sys.version_info[0] == 3 and '__truediv__' not in mock._all_magics:
 if 'divmod' not in mock.numerics:
     mock._magics.add('__rdivmod__')
     mock._all_magics.add('__rdivmod__')
-from padme import _logger
-from padme import proxy
-from padme import unproxied
 
 
 # XXX: Set to True for revelation
