@@ -387,7 +387,7 @@ class proxy_as_function(unittest.TestCase):
         """ verify that hasattr() behaves the same for original and proxy. """
         class C(object):
             pass
-        special_methods = '''
+        special_methods = str('''
             __del__
             __repr__
             __str__
@@ -423,7 +423,7 @@ class proxy_as_function(unittest.TestCase):
             __contains__
             __enter__
             __exit__
-        '''.split()
+        ''').split()
         for obj in [C(), 42, property(lambda x: x), int, None]:
             self.obj = obj
             self.proxy = proxy(self.obj)
