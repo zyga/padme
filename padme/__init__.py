@@ -666,18 +666,7 @@ class proxy(proxy_base):
             "%s.__new__ with proxiee: %r (args: %r, kwargs %r)",
             proxy_cls.__name__, proxiee, args, kwargs)
         proxiee_cls = type(proxiee)
-        if proxiee_cls not in proxy_cls._m_registry:
-            typed_proxy_meta = make_typed_proxy_meta(proxiee_cls)
-            proxy_cls._m_registry[proxiee_cls] = typed_proxy_meta
-        else:
-            typed_proxy_meta = proxy_cls._m_registry[proxiee_cls]
-        if proxiee_cls not in proxy_cls._c_registry:
-            typed_proxy_cls = metaclass(typed_proxy_meta)(
-                proxy_cls, str('{}[{}]').format(
-                    proxy_cls.__name__, proxiee_cls.__name__))
-            proxy_cls._c_registry[proxiee_cls] = typed_proxy_cls
-        else:
-            typed_proxy_cls = proxy_cls._c_registry[proxiee_cls]
+        typed_proxy_cls = proxy_cls[proxiee_cls]
         # XXX: This somehow magically calls __init__(*args, **kwargs)
         proxy_obj = object.__new__(typed_proxy_cls)
         state = proxy_state(proxy_obj)
