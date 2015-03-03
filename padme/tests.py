@@ -68,6 +68,7 @@ reality_is_broken = False
 
 
 def load_tests(loader, tests, ignore):
+    """ Load doctests for padme (part of unittest test discovery protocol). """
     import padme
     tests.addTests(
         doctest.DocTestSuite(padme, optionflags=doctest.REPORT_NDIFF))
@@ -75,6 +76,7 @@ def load_tests(loader, tests, ignore):
 
 
 def setUpModule():
+    """ Module-level setup function (part of unittest protocol). """
     if reality_is_broken:
         import logging
         logging.basicConfig(level=logging.DEBUG)
@@ -82,7 +84,10 @@ def setUpModule():
 
 class proxy_as_function(unittest.TestCase):
 
+    """ Tests for uses of proxy() as factory for proxy objects.  """
+
     def setUp(self):
+        """ Per-test-case setup function. """
         if reality_is_broken:
             print()
             _logger.debug("STARTING")
@@ -91,21 +96,25 @@ class proxy_as_function(unittest.TestCase):
         self.proxy = proxy(self.obj)
 
     def tearDown(self):
+        """ Per-test-case teardown function. """
         if reality_is_broken:
             _logger.debug("DONE")
 
     # NOTE: order of test methods matches implementation
 
     def test_repr(self):
+        """ Verify that repr/__repr__ is redirected to the proxiee. """
         self.assertEqual(repr(self.proxy), repr(self.obj))
         self.assertEqual(self.proxy.__repr__(), repr(self.obj))
 
     def test_str(self):
+        """ Verify that str/__str__ is redirected to the proxiee. """
         self.assertEqual(str(self.proxy), str(self.obj))
         self.assertEqual(self.proxy.__str__(), str(self.obj))
 
     @unittest.skipUnless(sys.version_info[0] == 3, "requires python 3")
     def test_bytes(self):
+        """ Verify that bytes/__bytes__ is redirected to the proxiee. """
         # NOTE: bytes() is unlike str() or repr() in that it is not a function
         # that converts an arbitrary object into a bytes object.  We cannot
         # just call it on a random object. What we must do is implement
@@ -119,10 +128,12 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(self.proxy.__bytes__(), bytes(self.obj))
 
     def test_format(self):
+        """ Verify that format/__format__ is redirected to the proxiee. """
         self.assertEqual(format(self.proxy), format(self.obj))
         self.assertEqual(self.proxy.__format__(""), format(self.obj))
 
     def test_lt(self):
+        """ Verify that < /__lt__ is redirected to the proxiee. """
         # NOTE: MagicMock is not ordered so let's just use an integer
         self.obj = 0
         self.proxy = proxy(self.obj)
@@ -130,6 +141,7 @@ class proxy_as_function(unittest.TestCase):
         self.assertLess(self.obj, 1)
 
     def test_le(self):
+        """ Verify that <=/ __le__ is redirected to the proxiee. """
         # NOTE: MagicMock is not ordered so let's just use an integer
         self.obj = 0
         self.proxy = proxy(self.obj)
@@ -139,17 +151,20 @@ class proxy_as_function(unittest.TestCase):
         self.assertLessEqual(self.obj, 1)
 
     def test_eq(self):
+        """ Verify that == /__eq__ is redirected to the proxiee. """
         self.assertEqual(self.proxy, self.obj)
         self.obj.__eq__.assert_called_once_with(self.obj)
         self.assertEqual(self.obj, self.obj)
 
     def test_ne(self):
+        """ Verify that != /__ne__ is redirected to the proxiee. """
         other = object()
         self.assertNotEqual(self.proxy, other)
         self.obj.__ne__.assert_called_once_with(other)
         self.assertNotEqual(self.obj, object())
 
     def test_gt(self):
+        """ Verify that > /__gt__ is redirected to the proxiee. """
         # NOTE: MagicMock is not ordered so let's just use an integer
         self.obj = 0
         self.proxy = proxy(self.obj)
@@ -157,6 +172,7 @@ class proxy_as_function(unittest.TestCase):
         self.assertGreater(self.obj, -1)
 
     def test_ge(self):
+        """ Verify that >= /__ge__ is redirected to the proxiee. """
         # NOTE: MagicMock is not ordered so let's just use an integer
         self.obj = 0
         self.proxy = proxy(self.obj)
@@ -167,6 +183,7 @@ class proxy_as_function(unittest.TestCase):
 
     @unittest.skipUnless(sys.version_info[0] == 2, "requires python 2")
     def test_cmp(self):
+        """ Verify that cmp /__cmp__ is redirected to the proxiee. """
         class C(object):
             def __cmp__(self, other):
                 return -1
@@ -177,44 +194,51 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(self.proxy.__cmp__(other), cmp(self.obj, other))
 
     def test_hash(self):
+        """ Verify that hash /__hash__ is redirected to the proxiee. """
         self.assertEqual(hash(self.proxy), hash(self.obj))
         self.assertEqual(self.proxy.__hash__(), hash(self.obj))
 
     @unittest.skipUnless(sys.version_info[0] == 3, "requires python 3")
     def test_bool(self):
+        """ Verify that bool /__bool__ is redirected to the proxiee. """
         self.assertEqual(bool(self.proxy), bool(self.obj))
         self.assertEqual(self.proxy.__bool__(), bool(self.obj))
 
     @unittest.skipUnless(sys.version_info[0] == 2, "requires python 2")
     def test_nonzero(self):
+        """ Verify that bool /__nonzero__ is redirected to the proxiee. """
         self.assertEqual(bool(self.proxy), bool(self.obj))
         self.assertEqual(self.proxy.__nonzero__(), bool(self.obj))
 
     @unittest.skipUnless(sys.version_info[0] == 2, "requires python 2")
     def test_unicode(self):
+        """ Verify that unicode /__unicode__ is redirected to the proxiee. """
         self.assertEqual(unicode(self.proxy), unicode(self.obj))
         self.assertEqual(self.proxy.__unicode__(), unicode(self.obj))
 
     def test_attr_get(self):
+        """ Verify that attribute reads are redirected to the proxiee. """
         self.assertIs(self.proxy.attr, self.obj.attr)
 
     def test_attr_set(self):
+        """ Verify that attribute writes are redirected to the proxiee. """
         value = mock.Mock(name='value')
         self.proxy.attr = value
         self.assertIs(self.obj.attr, value)
 
     def test_attr_del(self):
+        """ Verify that attribute deletes are redirected to the proxiee. """
         del self.proxy.attr
         with self.assertRaises(AttributeError):
             self.obj.attr
 
     def test_dir(self):
+        """ Verify that dir / __dir__ is redirected to the proxiee. """
         self.assertEqual(dir(self.proxy), dir(self.obj))
         self.assertEqual(self.proxy.__dir__(), dir(self.obj))
 
     def test_descriptor_methods(self):
-        # NOTE: this tests __get__, __set__ and __delete__ in one test, for
-        # brevity
+        """ Verify that __{get,set,delete}__ are redirected to the proxiee. """
         property_proxy = proxy(property)
 
         class C(object):
@@ -243,16 +267,19 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(obj._ok, "default")
 
     def test_call(self):
+        """ Verify that __call__ is redirected to the proxiee. """
         self.assertEqual(self.proxy(), self.obj())
         self.assertEqual(self.proxy.__call__(), self.obj())
 
     def test_len(self):
+        """ Verify that len / __len__ is redirected to the proxiee. """
         self.assertEqual(len(self.proxy), len(self.obj))
         self.assertEqual(self.proxy.__len__(), len(self.obj))
 
     @unittest.skipUnless(sys.version_info[0:2] >= (3, 4),
                          "requires python 3.4")
     def test_length_hint(self):
+        """ Verify that __length_hint__ is redirected to the proxiee. """
         # NOTE: apparently MagicMock doesn't support this method
         class C(object):
             def __length_hint__(self):
@@ -265,10 +292,12 @@ class proxy_as_function(unittest.TestCase):
             self.proxy.__length_hint__(), operator.length_hint(self.obj))
 
     def test_getitem(self):
+        """ Verify that [] / __getitem__ is redirected to the proxiee. """
         self.assertEqual(self.proxy['item'], self.obj['item'])
         self.assertEqual(self.proxy.__getitem__('item'), self.obj['item'])
 
     def test_setitem_v1(self):
+        """ Verify that []= is redirected to the proxiee. """
         # NOTE: MagicMock doesn't store item assignment
         self.obj = ["old"]
         self.proxy = proxy(self.obj)
@@ -276,6 +305,7 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(self.obj[0], "new")
 
     def test_setitem_v2(self):
+        """ Verify that __setitem__ is redirected to the proxiee. """
         # NOTE: MagicMock doesn't store item assignment
         self.obj = ["old"]
         self.proxy = proxy(self.obj)
@@ -283,6 +313,7 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(self.obj[0], "value")
 
     def test_delitem(self):
+        """ Verify that del[] / __delitem__ is redirected to the proxiee. """
         obj = {'k': 'v'}
         del proxy(obj)['k']
         self.assertEqual(obj, {})
@@ -291,6 +322,7 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(obj, {})
 
     def test_iter(self):
+        """ Verify that iter / __iter__ is redirected to the proxiee. """
         # NOTE: MagicMock.__iter__ needs to return a deterministic iterator as
         # by default a new iterator is returned each time.
         self.obj.__iter__.return_value = iter([])
@@ -298,6 +330,7 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(self.proxy.__iter__(), iter(self.obj))
 
     def test_reversed(self):
+        """ Verify that __reversed__ is redirected to the proxiee. """
         # NOTE: apparently MagicMock.doesn't support __reversed__ so we fall
         # back to the approach with a custom class. The same comment, as above,
         # for __iter__() applies though.
@@ -315,6 +348,7 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(self.proxy.__reversed__(), reversed(self.obj))
 
     def test_contains(self):
+        """ Verify that __contains__ is redirected to the proxiee. """
         item = object()
         self.assertEqual(item in self.proxy, item in self.obj)
         self.assertEqual(self.proxy.__contains__(item), item in self.obj)
@@ -327,12 +361,14 @@ class proxy_as_function(unittest.TestCase):
     # TODO, tests and implementation for all the numeric methods
 
     def test_context_manager_methods_v1(self):
+        """ Verify that __enter__ and __exit__ are redirected. """
         with self.proxy:
             pass
         self.obj.__enter__.assert_called_once_with()
         self.obj.__exit__.assert_called_once_with(None, None, None)
 
     def test_context_manager_methods_v2(self):
+        """ Verify that redirecting __exit__ passes right arguments. """
         exc = Exception("boom")
         with self.assertRaisesRegex(Exception, "boom"):
             with self.proxy:
@@ -347,6 +383,7 @@ class proxy_as_function(unittest.TestCase):
         self.obj.__exit__.assert_called_once_with(Exception, exc, traceback)
 
     def test_hasattr_parity(self):
+        """ verify that hasattr() behaves the same for original and proxy. """
         class C(object):
             pass
         special_methods = '''
@@ -397,11 +434,13 @@ class proxy_as_function(unittest.TestCase):
                         attr, self.obj))
 
     def test_isinstance(self):
+        """ Verify that isinstance() checks work. """
         # NOTE: this method tests the metaclass
         self.assertIsInstance(self.obj, type(self.obj))
         self.assertIsInstance(self.proxy, type(self.obj))
 
     def test_issubclass(self):
+        """ Verify that issubclass() checks work. """
         # NOTE: this method tests the metaclass
         # NOTE: mock doesn't support subclasscheck
         # NOTE: str ... below is just for python 2.7
@@ -411,6 +450,7 @@ class proxy_as_function(unittest.TestCase):
         self.assertTrue(issubclass(str, type(proxy(obj))))
 
     def test_class(self):
+        """ Verify that proxy_obj.__class__ is redirected to the proxiee. """
         self.assertEqual(self.proxy.__class__, self.obj.__class__)
         # NOTE: The proxy cannot hide the fact, that it is a proxy
         self.assertNotEqual(type(self.proxy), type(self.obj))
@@ -418,17 +458,22 @@ class proxy_as_function(unittest.TestCase):
 
 class proxy_as_class(unittest.TestCase):
 
+    """ Tests for uses of proxy() as a base class for specialized proxies. """
+
     def setUp(self):
+        """ Per-test-case setup function. """
         if reality_is_broken:
             print()
             _logger.debug("STARTING")
             _logger.debug("[%s]", self._testMethodName)
 
     def tearDown(self):
+        """ Per-test-case teardown function. """
         if reality_is_broken:
             _logger.debug("DONE")
 
     def test_proxy_subclass(self):
+        """ Verify that basic @unproxied use case works. """
         # NOTE: bring your comb, because this is the extra-hairy land
         class censored(proxy):
 
