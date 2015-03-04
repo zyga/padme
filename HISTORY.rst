@@ -3,7 +3,7 @@
 History
 =======
 
-1.1 (YYYY-MM-DD)
+1.1 (2015-03-04)
 ----------------
 * Add general support for **Python 2.7**.
 * All numeric methods are now supported with some methods
