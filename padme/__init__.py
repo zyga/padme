@@ -227,9 +227,12 @@ class proxy_meta(type):
         ns['__unproxied__'] = frozenset(unproxied_set)
         # _logger.debug("injecting fresh _c_registry into %s", name)
         ns['_c_registry'] = {}
-        return super(proxy_meta, mcls).__new__(mcls, name, bases, ns)
+        cls = super(proxy_meta, mcls).__new__(mcls, name, bases, ns)
+        cls._untyped_base = cls
+        return cls
 
     def __getitem__(proxy_cls, proxiee_cls):
+        proxy_cls = proxy_cls._untyped_base
         if not isinstance(proxiee_cls, type):
             raise ValueError("proxiee_cls must be a type")
         if proxiee_cls not in proxy_cls._m_registry:
@@ -244,6 +247,7 @@ class proxy_meta(type):
             proxy_cls._c_registry[proxiee_cls] = typed_proxy_cls
         else:
             typed_proxy_cls = proxy_cls._c_registry[proxiee_cls]
+        typed_proxy_cls._untyped_base = proxy_cls
         return typed_proxy_cls
 
 
@@ -352,8 +356,9 @@ def _imethod(self, other, name, op):
         # the __iFUNC__ method returns something other than self. To maintain
         # the illusion that the proxy is not there the internal proxiee
         # reference is changed to the new proxiee.
-        _logger.debug("%s sets new proxiee (%r)", name, proxiee_new)
-        _set_proxiee(self, proxiee_new)
+        _logger.debug("%s creates new %s (%r)",
+                      name, type(self).__name__, proxiee_new)
+        return type(self)(proxiee_new)
     return self
 
 
