@@ -193,7 +193,7 @@ import sys
 
 __author__ = 'Zygmunt Krynicki'
 __email__ = 'zygmunt.krynicki@canonical.com'
-__version__ = '1.1'
+__version__ = '1.1.1'
 __all__ = (str('proxy'), )
 
 _logger = logging.getLogger("padme")
