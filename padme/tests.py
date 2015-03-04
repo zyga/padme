@@ -596,47 +596,89 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(self.proxy.__ror__(other), other | self.obj)
         self.assertEqual(1 | proxy(2), 3)
 
-    def test_iadd__via_operator(self):
-        """ Verify that += is redirected to the proxiee. """
+    def test_iadd__via_operator__mutable(self):
+        """ Verify that += is redirected to the proxiee (mutable case). """
+        # Mock__iadd__ that returns the object itself
+        self.obj.__iadd__.return_value = self.obj
         other = mock.MagicMock()
         proxy_old = self.proxy
         self.proxy += other
+        # __iadd__ was called and mutated the state of obj
         self.obj.__iadd__.assert_called_with(other)
-        self.assertTrue(issubclass(type(self.proxy), proxy))
+        # += returned the same proxy object
         self.assertIs(self.proxy, proxy_old)
+        self.assertTrue(issubclass(type(self.proxy), proxy))
+        # the proxy object tracks the original object
+        self.assertIs(proxy.original(self.proxy), self.obj)
 
-    def test_iadd__via_dunder(self):
+    def test_iadd__via_operator__immutable(self):
+        """ Verify that += is redirected to the proxiee (immutable case). """
+        # Mock the absence of __iadd__
+        del self.obj.__iadd__
+        other = mock.MagicMock()
+        proxy_old = self.proxy
+        self.proxy += other
+        # __add__ was called and returned new obj
+        self.obj.__add__.assert_called_with(other)
+        # += returned a new proxy object
+        self.assertTrue(issubclass(type(self.proxy), proxy))
+        self.assertIsNot(self.proxy, proxy_old)
+        # the new proxy object tracks new object
+        self.assertIsNot(proxy.original(self.proxy), self.obj)
+
+    def test_iadd__via_dunder__mutable(self):
         """ Verify that __iadd__ is redirected to the proxiee. """
+        # Mock __iadd__ that returns the object itself
+        self.obj.__iadd__.return_value = self.obj
         other = mock.MagicMock()
         proxy_old = self.proxy
         self.proxy = self.proxy.__iadd__(other)
+        # __iadd__ was called and mutated the state of obj
         self.obj.__iadd__.assert_called_with(other)
-        self.assertTrue(issubclass(type(self.proxy), proxy))
+        # += returned the same proxy object
         self.assertIs(self.proxy, proxy_old)
+        self.assertTrue(issubclass(type(self.proxy), proxy))
+        # the proxy object tracks the original object
+        self.assertIs(proxy.original(self.proxy), self.obj)
+
+    def test_iadd__via_dunder__immutable(self):
+        """ Verify that __iadd__ doesn't show up if not originally present. """
+        # Mock the absence of __iadd__
+        del self.obj.__iadd__
+        other = mock.MagicMock()
+        with self.assertRaises(AttributeError):
+            self.proxy.__iadd__(other)
 
     def test_iadd__on_int__via_operator(self):
         """ Verify that += works on proxy[int]. """
         # int is immutable so += actually works using the + operator
-        a = proxy(2)
-        a += 2
-        self.assertEqual(a, 4)
+        a = b = proxy(2)
+        # b is modified, a is unchanged
+        b += 2
+        self.assertEqual(a, 2)
+        self.assertEqual(b, b)
         self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
 
     def test_iadd__on_str__via_operator(self):
         """ Verify that += works on proxy[str]. """
         # str is immutable so += actually works using the + operator
-        a = proxy("hello")
-        a += " world"
-        self.assertEqual(a, "hello world")
+        a = b = proxy("hello")
+        b += " world"
+        self.assertEqual(a, "hello")
+        self.assertEqual(b, "hello world")
         self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
 
     def test_iadd__on_list__via_operator(self):
         """ Verify that += works on proxy[list]. """
         # list is mutable so += is implemented directly
-        a = proxy(['first'])
-        a += ['second']
+        a = b = proxy(['first'])
+        b += ['second']
         self.assertEqual(a, ['first', 'second'])
+        self.assertEqual(b, ['first', 'second'])
         self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
 
     def test_iadd__on_int__via_dunder(self):
         """ Verify that __iadd__ doesn't exist on proxy[int]. """
@@ -660,6 +702,7 @@ class proxy_as_function(unittest.TestCase):
         """ Verify that __iadd__ works on proxy[list]. """
         a = proxy(['first'])
         b = a.__iadd__(['second'])
+        self.assertEqual(a, ['first', 'second'])
         self.assertEqual(b, ['first', 'second'])
         self.assertTrue(issubclass(type(a), proxy))
         self.assertTrue(issubclass(type(b), proxy))

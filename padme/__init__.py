@@ -356,8 +356,9 @@ def _imethod(self, other, name, op):
         # the __iFUNC__ method returns something other than self. To maintain
         # the illusion that the proxy is not there the internal proxiee
         # reference is changed to the new proxiee.
-        _logger.debug("%s sets new proxiee (%r)", name, proxiee_new)
-        _set_proxiee(self, proxiee_new)
+        _logger.debug("%s creates new %s (%r)",
+                      name, type(self).__name__, proxiee_new)
+        return type(self)(proxiee_new)
     return self
 
 
