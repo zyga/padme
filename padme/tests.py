@@ -708,6 +708,115 @@ class proxy_as_function(unittest.TestCase):
         self.assertTrue(issubclass(type(b), proxy))
         self.assertIs(a, b)
 
+    def test_isub__on_int(self):
+        """ Verify that -= works on proxy[int]. """
+        a = b = proxy(4)
+        b -= 3
+        self.assertEqual(a, 4)
+        self.assertEqual(b, 1)
+        self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
+
+    def test_imul__on_int(self):
+        """ Verify that *= works on proxy[int]. """
+        a = b = proxy(4)
+        b *= 2
+        self.assertEqual(a, 4)
+        self.assertEqual(b, 8)
+        self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
+
+    @unittest.skipUnless(sys.version_info[0] == 2, "requires python 2")
+    def test_idiv__on_int(self):
+        """ Verify that (old) /= works on proxy[int]. """
+        a = b = proxy(7)
+        b = operator.idiv(b, 2)
+        self.assertEqual(a, 7)
+        self.assertEqual(b, 3)
+        self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
+
+    def test_itruediv__on_int(self):
+        """ Verify that (true) /= works on proxy[int]. """
+        a = b = proxy(7)
+        b = operator.itruediv(b, 2)
+        self.assertEqual(a, 7)
+        self.assertEqual(b, 3.5)
+        self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
+
+    def test_ifloordiv__on_int(self):
+        """ Verify that //= works on proxy[int]. """
+        a = b = proxy(7)
+        b //= 2
+        self.assertEqual(a, 7)
+        self.assertEqual(b, 3)
+        self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
+
+    def test_imod__on_int(self):
+        """ Verify that %= works on proxy[int]. """
+        a = b = proxy(7)
+        b %= 2
+        self.assertEqual(a, 7)
+        self.assertEqual(b, 1)
+        self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
+
+    def test_ipow__on_int(self):
+        """ Verify that **= works on proxy[int]. """
+        a = b = proxy(7)
+        b **= 2
+        self.assertEqual(a, 7)
+        self.assertEqual(b, 49)
+        self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
+
+    def test_ilshift__on_int(self):
+        """ Verify that <<= works on proxy[int]. """
+        a = b = proxy(1)
+        b <<= 10
+        self.assertEqual(a, 1)
+        self.assertEqual(b, 1024)
+        self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
+
+    def test_irshift__on_int(self):
+        """ Verify that >>= works on proxy[int]. """
+        a = b = proxy(1024)
+        b >>= 10
+        self.assertEqual(a, 1024)
+        self.assertEqual(b, 1)
+        self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
+
+    def test_iand__on_int(self):
+        """ Verify that &= works on proxy[int]. """
+        a = b = proxy(7)
+        b &= 4
+        self.assertEqual(a, 7)
+        self.assertEqual(b, 4)
+        self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
+
+    def test_ixor__on_int(self):
+        """ Verify that ^= works on proxy[int]. """
+        a = b = proxy(7)
+        b ^= 5
+        self.assertEqual(a, 7)
+        self.assertEqual(b, 2)
+        self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
+
+    def test_ior__on_int(self):
+        """ Verify that |= works on proxy[int]. """
+        a = b = proxy(7)
+        b |= 8
+        self.assertEqual(a, 7)
+        self.assertEqual(b, 15)
+        self.assertTrue(issubclass(type(a), proxy))
+        self.assertTrue(issubclass(type(b), proxy))
+
     def test_context_manager_methods_v1(self):
         """ Verify that __enter__ and __exit__ are redirected. """
         with self.proxy:
