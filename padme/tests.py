@@ -63,6 +63,15 @@ if 'divmod' not in mock.numerics:
     mock._magics.add('__rdivmod__')
     mock._all_magics.add('__rdivmod__')
 
+# http://bugs.python.org/issue23581
+if 'matmul' not in mock.numerics:
+    mock._magics.add('__matmul__')
+    mock._magics.add('__rmatmul__')
+    mock._magics.add('__imatmul__')
+    mock._all_magics.add('__matmul__')
+    mock._all_magics.add('__rmatmul__')
+    mock._all_magics.add('__imatmul__')
+
 
 # XXX: Set to True for revelation
 reality_is_broken = False
