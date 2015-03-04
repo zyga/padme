@@ -59,7 +59,7 @@ if sys.version_info[0] == 3 and '__truediv__' not in mock._all_magics:
     mock._all_magics.add('__itruediv__')
 
 # http://bugs.python.org/issue23568
-if 'divmod' not in mock.numerics:
+if '__rdivmod__' not in mock._magics:
     mock._magics.add('__rdivmod__')
     mock._all_magics.add('__rdivmod__')
 
