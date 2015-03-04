@@ -614,6 +614,14 @@ class proxy_base(object):
         _logger.debug("__mul__ on proxiee (%r)", proxiee)
         return proxiee * other
 
+    if sys.version_info[0:2] >= (3, 5):
+        def __matmul__(self, other):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__matmul__ on proxiee (%r)", proxiee)
+            # NOTE: this is equivalent to ``proxiee @ other`` but we cannot use
+            # this syntax as long as 3.4 and earlier have to be supported.
+            return operator.matmul(proxiee, other)
+
     if sys.version_info[0] == 2:
         def __div__(self, other):
             proxiee = _get_proxiee(self)
@@ -687,6 +695,14 @@ class proxy_base(object):
         _logger.debug("__rmul__ on proxiee (%r)", proxiee)
         return other * proxiee
 
+    if sys.version_info[0:2] >= (3, 5):
+        def __rmatmul__(self, other):
+            proxiee = _get_proxiee(self)
+            _logger.debug("__rmatmul__ on proxiee (%r)", proxiee)
+            # NOTE: this is equivalent to ``proxiee @ other`` but we cannot use
+            # this syntax as long as 3.4 and earlier have to be supported.
+            return operator.matmul(other, proxiee)
+
     if sys.version_info[0] == 2:
         def __rdiv__(self, other):
             proxiee = _get_proxiee(self)
@@ -753,6 +769,10 @@ class proxy_base(object):
 
     def __imul__(self, other):
         return _imethod(self, other, '__imul__', operator.imul)
+
+    if sys.version_info[0:2] >= (3, 5):
+        def __imatmul__(self, other):
+            return _imethod(self, other, '__imatmul__', operator.imatmul)
 
     if sys.version_info[0] == 2:
         def __idiv__(self, other):
