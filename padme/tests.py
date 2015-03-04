@@ -386,6 +386,15 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(proxy(5) * 2, 10)
         self.assertEqual(proxy("foo") * 2, "foofoo")
 
+    @unittest.skipUnless(
+        sys.version_info[0:2] >= (3, 5), "requires python 3.5")
+    def test_matmul(self):
+        other = mock.MagicMock()
+        self.assertEqual(operator.matmul(self.proxy, other),
+                         operator.matmul(self.obj, other))
+        self.assertEqual(self.proxy.__matmul__(other),
+                         operator.matmul(self.obj, other))
+
     @unittest.skipUnless(sys.version_info[0] == 2, "requires python 2")
     def test_div(self):
         other = mock.MagicMock()
@@ -500,6 +509,16 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(4.5 * proxy(2), 9.0)
         self.assertEqual(5 * proxy(2), 10)
         self.assertEqual("foo" * proxy(2), "foofoo")
+
+    @unittest.skipUnless(
+        sys.version_info[0:2] >= (3, 5), "requires python 3.5")
+    def test_rmatmul(self):
+        """ Verify that __rmul__ is redirected to the proxiee. """
+        other = mock.Mock()
+        self.assertEqual(operator.matmul(other, self.proxy),
+                         operator.matmul(other, self.obj))
+        self.assertEqual(self.proxy.__rmatmul__(other),
+                         operator.matmul(other, self.obj))
 
     @unittest.skipUnless(sys.version_info[0] == 2, "requires python 2")
     def test_rdiv(self):
@@ -725,6 +744,9 @@ class proxy_as_function(unittest.TestCase):
         self.assertEqual(b, 8)
         self.assertTrue(issubclass(type(a), proxy))
         self.assertTrue(issubclass(type(b), proxy))
+
+    # NOTE: there's no type in stdlib that supports matmul so there's no smoke
+    # test for that.
 
     @unittest.skipUnless(sys.version_info[0] == 2, "requires python 2")
     def test_idiv__on_int(self):

@@ -7,6 +7,7 @@ History
 ----------------
 * Add general support for **Python 2.7**.
 * All numeric methods are now supported.
+* Add support for the new matrix multiplication operator ``@``.
 * Make ``__nonzero__()`` and ``__unicode__()`` exlusive to Python 2.x.
 * Make ``__bool__()`` and ``__bytes__()`` exclusive to Python 3.x.
 * Make ``__length_hint()`` exclusive to Python 3.4.
