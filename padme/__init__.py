@@ -190,6 +190,7 @@ from __future__ import print_function, absolute_import, unicode_literals
 import logging
 import operator
 import sys
+import weakref
 
 __author__ = 'Zygmunt Krynicki'
 __email__ = 'zygmunt.krynicki@canonical.com'
@@ -197,6 +198,169 @@ __version__ = '1.1.1'
 __all__ = (str('proxy'), )
 
 _logger = logging.getLogger("padme")
+
+
+class Aspect(object):
+
+    """Aspect of another object."""
+
+    def __repr__(self):
+        return "<{}.{} object at {:#x} with state {!r}>".format(
+            __name__, self.__class__.__name__, id(self), self.__dict__)
+
+
+class WeakProxyMap(object):
+
+    """
+    A set-like class that can store otherwise unhashable proxy objects.
+    """
+
+    def __init__(self):
+        self._hash_to_list = {}
+        self._len = 0
+
+    def __len__(self):
+        return self._len
+
+    def __repr__(self):
+        return "<{} with {} items: {}>".format(
+            self.__class__.__name__, self._len, self._hash_to_list)
+
+    def _discard(self, obj_hash, dead_ref):
+        # print("Discarding (hash {}) {}".format(obj_hash, dead_ref))
+        h2l = self._hash_to_list
+        for index, ref_value in enumerate(h2l[obj_hash]):
+            ref, value = ref_value
+            if ref is dead_ref:
+                break
+        else:
+            assert False
+        del h2l[obj_hash][index]
+        if len(h2l[obj_hash]) == 0:
+            del h2l[obj_hash]
+        self._len -= 1
+
+    def __setitem__(self, proxy_obj, new_value):
+        # print("Setting {:#x} = {!r}".format(id(proxy_obj), new_value))
+        if not issubclass(type(proxy_obj), proxy):
+            raise ValueError
+        h2l = self._hash_to_list
+        obj_hash = object.__hash__(proxy_obj)
+        if obj_hash not in h2l:
+            h2l[obj_hash] = []
+        for index, ref_value in enumerate(h2l[obj_hash]):
+            ref, value = ref_value
+            if ref() is proxy_obj:
+                h2l[obj_hash][index] = (ref, new_value)
+                break
+        else:
+            ref = weakref.ref(
+                proxy_obj, lambda _: self._discard(obj_hash, _))
+            h2l[obj_hash].append((ref, new_value))
+            self._len += 1
+
+    def __getitem__(self, proxy_obj):
+        if not issubclass(type(proxy_obj), proxy):
+            raise ValueError
+        h2l = self._hash_to_list
+        obj_hash = object.__hash__(proxy_obj)
+        if obj_hash not in h2l:
+            raise KeyError(proxy_obj)
+        for ref, value in h2l[obj_hash]:
+            if ref() is proxy_obj:
+                return value
+        else:
+            raise KeyError(proxy_obj)
+
+    def __contains__(self, proxy_obj):
+        if not issubclass(type(proxy_obj), proxy):
+            raise ValueError
+        h2l = self._hash_to_list
+        obj_hash = object.__hash__(proxy_obj)
+        if obj_hash not in h2l:
+            return False
+        for ref, value in h2l[obj_hash]:
+            if ref() is proxy_obj:
+                return True
+        else:
+            raise False
+
+
+class AspectCollection(object):
+
+    """
+    Collection of aspects of other objects.
+
+    This class implements object<->aspect association based on object
+    identity alone. The object must support weak references as this is
+    the only way it can be tracked and stale aspects, discarded
+
+    .. note::
+        Because an object can be a proxy and aspects are a part
+        of the implementation of the proxy, we cannot rely on any useful
+        property of the object apart from its identity. In particular, we
+        cannot rely on hashing.
+    """
+
+    def __init__(self):
+        self._aspects = WeakProxyMap()
+
+    def get(self, obj, attr, default=None):
+        if obj is None:
+            raise ValueError
+        try:
+            aspect = getattr(self._aspects[obj])
+            del obj
+            return getattr(aspect, attr, default)
+        except KeyError:
+            return default
+
+    def __getitem__(self, obj):
+        aspect = self.get_or_create(obj)
+        del obj
+        return aspect
+
+    def get_or_create(self, obj, **aspect_attrs):
+        if obj is None:
+            raise ValueError
+        try:
+            aspect = self._aspects[obj]
+            # print("Found aspect: {!r}".format(aspect))
+        except KeyError:
+            aspect = Aspect()
+            aspect.__dict__.update(aspect_attrs)
+            # print("Created aspect: {!r}".format(aspect))
+            self._aspects[obj] = aspect
+        del obj
+        return aspect
+
+    def _debug(self):
+        for ref_value_list in self._aspects._hash_to_list.values():
+            for ref, value in ref_value_list:
+                obj = ref()
+                if obj is not None:
+                    import gc
+                    import pdb
+                    refs = gc.get_referrers(obj)
+                    print("Aspect for: {!r} from: {}".format(obj, refs))
+                    pdb.set_trace()
+
+# Aspect for tracking the ``unproxied`` (``direct``) attribute of proxy
+# properties and other objects that cannot hold any attributes directly.
+_unproxied_aspect = AspectCollection()
+
+# Aspect for tracking arbitrary state of any proxy. One notable element is
+# the ``_original`` attribute which holds the proxiee itself.
+_state_aspect = AspectCollection()
+
+
+def _get_proxiee(proxy_obj):
+    return _state_aspect[proxy_obj]._original
+
+
+def _set_proxiee(proxy_obj, proxiee):
+    _state_aspect.get_or_create(proxy_obj, _original=proxiee)
+    # _state_aspect[proxy_obj]._original = proxiee
 
 
 class proxy_meta(type):
@@ -220,6 +384,9 @@ class proxy_meta(type):
                 unproxied_set.update(base.__unproxied__)
         for ns_attr, ns_value in ns.items():
             if getattr(ns_value, 'unproxied', False):
+                unproxied_set.add(ns_attr)
+            elif (isinstance(ns_value, property) and
+                    _unproxied_aspect.get(ns_value, 'unproxied', False)):
                 unproxied_set.add(ns_attr)
         if unproxied_set:
             _logger.debug(
@@ -293,14 +460,6 @@ def make_typed_proxy_meta(proxiee_cls):
         '__subclasscheck__': __subclasscheck__
     }
     return proxy_meta(name, bases, ns)
-
-
-def _get_proxiee(proxy_obj):
-    return object.__getattribute__(proxy_obj, '_original')
-
-
-def _set_proxiee(proxy_obj, proxiee):
-    return object.__setattr__(proxy_obj, '_original', proxiee)
 
 
 def _get_unproxied(proxy):
@@ -501,8 +660,10 @@ class proxy_base(object):
             _logger.debug(
                 "%s.__getattribute__ %r on proxy itself (augmented"
                 " assignment)", type(self).__name__, name)
+            # Poke the proxiee to see if it even has the required attribute
             proxiee = _get_proxiee(self)
             object.__getattribute__(proxiee, name)
+            # Now do the real reference on the proxy itself
             return object.__getattribute__(self, name)
         else:
             proxiee = _get_proxiee(self)
@@ -890,25 +1051,6 @@ class proxy_base(object):
         return proxiee.__exit__(exc_type, exc_value, traceback)
 
 
-class proxy_state(object):
-
-    """
-    Support class for working with proxy state.
-
-    This class implements simple attribute-based access methods. It is normally
-    instantiated internally for each proxy object. You don't want to fuss with
-    it manually, instead just use :meth:`proxy.state()` function to access it.
-    """
-
-    def __init__(self, proxy_obj):
-        proxy_dict = object.__getattribute__(proxy_obj, '__dict__')
-        object.__setattr__(self, '__dict__', proxy_dict)
-
-    def __repr__(self):
-        return "<{}.{} object at {:#x} with state {!r}>".format(
-            __name__, self.__class__.__name__, id(self), self.__dict__)
-
-
 class metaclass(object):
 
     """
@@ -1026,11 +1168,7 @@ class proxy(proxy_base):
         proxiee_cls = type(proxiee)
         typed_proxy_cls = proxy_cls[proxiee_cls]
         proxy_obj = object.__new__(typed_proxy_cls)
-        state = proxy_state(proxy_obj)
-        # _logger.debug("%s.__new__ inserted _original into instance",
-        #               proxy_cls.__name__)
-        state._original = proxiee
-        # _logger.debug("%s.__new__ is about to return", proxy_cls.__name__)
+        _set_proxiee(proxy_obj, proxiee)
         return proxy_obj
 
     def __init__(proxy_obj, proxiee):
@@ -1066,8 +1204,12 @@ class proxy(proxy_base):
         For additional details on how to use this decorator, see the
         documentation of the :mod:`padme` module.
         """
-        fn.unproxied = True
-        _logger.debug("function %r marked as unproxied/direct", fn)
+        try:
+            fn.unproxied = True
+            _logger.debug("object %r marked as direct", fn)
+        except AttributeError:
+            _unproxied_aspect[fn].unproxied = True
+            _logger.debug("object %r marked as direct (via aspect)", fn)
         return fn
 
     @staticmethod
@@ -1105,8 +1247,7 @@ class proxy(proxy_base):
             >>> l
             [42]
         """
-        state = proxy_state(proxy_obj)
-        return state._original
+        return _get_proxiee(proxy_obj)
 
     @staticmethod
     def state(proxy_obj):
@@ -1137,9 +1278,14 @@ class proxy(proxy_base):
             >>> proxy.state(life).foo
             True
         """
-        return proxy_state(proxy_obj)
+        return _state_aspect[proxy_obj]
 
 
 # 1.0 backwards-compatibility aliases
 unproxied = proxy.direct
 proxiee = proxy.original
+
+
+# 1.1.1 backwards compatibility aliases
+def proxy_state(proxy):
+    return _state_aspect[proxy]
