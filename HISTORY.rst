@@ -3,6 +3,27 @@
 History
 =======
 
+1.2 (unreleased)
+----------------
+
+* Completely detach proxy state from the actual proxy object. This is done so
+  that the next feature is possible to implement (see below).
+* Allow proxy to override ``obj.__dict__``. This allows the new
+  ``masking_proxy`` to hide masked attributes from the object dictionary of the
+  original object.
+* Add specialized proxy that can hide arbitrary attributes
+  (:class:`padme.masking.masking_proxy`). This specialized proxy can be
+  instantiated with a set of masked (hidden) attributes. Those attributes, even
+  if preset in the original object, will be effectively hidden when accessed
+  through the proxy. Each masking proxy can hide a different set of attributes,
+  thus creating separate views on the same data.
+* Add utility function to create a proxy that hides everything but explicitly
+  allowed, public API (:func:`padme.public.get_public_proxy`). This
+  functionality is built on top of the ``masking_proxy``. It allows anyone to
+  create a proxy that only shows what is exposed by one or more interfaces.
+  Methods, attributes or properties not mentioned in any of the interfaces are
+  hidden.
+
 1.1.1 (2015-03-04)
 ------------------
 * Add general support for **Python 2.7**.
