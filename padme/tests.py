@@ -38,7 +38,7 @@ if sys.version_info[0:2] >= (3, 4):
     from unittest import mock
 else:
     import unittest2 as unittest
-    import mock
+    import mock.mock as mock
 
 
 # https://code.google.com/p/mock/issues/detail?id=247
