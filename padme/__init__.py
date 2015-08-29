@@ -459,7 +459,7 @@ class proxy_base(object):
         def __cmp__(self, other):
             proxiee = _get_proxiee(self)
             _logger.debug("__cmp__ on proxiee (%r)", proxiee)
-            return cmp(proxiee, other)
+            return cmp(proxiee, other)  # NOQA
 
     def __hash__(self):
         proxiee = _get_proxiee(self)
@@ -483,7 +483,7 @@ class proxy_base(object):
         def __unicode__(self):
             proxiee = _get_proxiee(self)
             _logger.debug("__unicode__ on proxiee (%r)", proxiee)
-            return unicode(proxiee)
+            return unicode(proxiee)  # NOQA
 
     def __getattr__(self, name):
         proxiee = _get_proxiee(self)
@@ -844,7 +844,7 @@ class proxy_base(object):
         def __long__(self):
             proxiee = _get_proxiee(self)
             _logger.debug("__long__ on proxiee (%r)", proxiee)
-            return long(proxiee)
+            return long(proxiee)  # NOQA
 
     def __float__(self):
         proxiee = _get_proxiee(self)
@@ -877,7 +877,7 @@ class proxy_base(object):
         def __coerce__(self, other):
             proxiee = _get_proxiee(self)
             _logger.debug("__coerce__ on proxiee (%r)", proxiee)
-            return coerce(proxiee, other)
+            return coerce(proxiee, other)  # NOQA
 
     def __enter__(self):
         proxiee = _get_proxiee(self)
